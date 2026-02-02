@@ -212,7 +212,7 @@
     let scene, camera, renderer, player, slimes = [];
     let isBattle = false, currentSlime = null;
     let moveSpeed = 0.4, cameraRotation = 0, cameraDistance = 40, cameraHeight = 28; 
-    let isRotating = false, lastMouseX = 0;
+    let isRotating = false, lastTouchX = 0;
     let joystickActive = false, joystickData = { x: 0, y: 0 };
     let stats = { lv: 1, exp: 0, maxExp: 100, gold: 0 };
 
@@ -241,10 +241,17 @@
         createSlimes(30); 
         updateUI();
 
+        // --- 虛擬搖桿控制邏輯 ---
         const stick = document.getElementById('joystick-stick');
         const wrapper = document.getElementById('joystick-wrapper');
-        const handleStart = (e) => { if (!isBattle) joystickActive = true; if(e.cancelable) e.preventDefault(); };
-        const handleMove = (e) => {
+        
+        const handleJoystickStart = (e) => { 
+            if (isBattle) return;
+            joystickActive = true; 
+            if(e.cancelable) e.preventDefault(); 
+        };
+        
+        const handleJoystickMove = (e) => {
             if (!joystickActive || isBattle) return;
             const touch = e.touches ? e.touches[0] : e;
             const rect = wrapper.getBoundingClientRect();
@@ -255,20 +262,61 @@
             stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
             joystickData.x = dx / maxRadius; joystickData.y = dy / maxRadius;
         };
-        const handleEnd = () => { joystickActive = false; stick.style.transform = 'translate(-50%, -50%)'; joystickData = {x:0, y:0}; };
         
-        wrapper.addEventListener('touchstart', handleStart);
-        window.addEventListener('touchmove', handleMove, { passive: false });
-        window.addEventListener('touchend', handleEnd);
-        wrapper.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
+        const handleJoystickEnd = () => { 
+            joystickActive = false; 
+            stick.style.transform = 'translate(-50%, -50%)'; 
+            joystickData = {x:0, y:0}; 
+        };
+        
+        wrapper.addEventListener('touchstart', handleJoystickStart, { passive: false });
+        window.addEventListener('touchmove', handleJoystickMove, { passive: false });
+        window.addEventListener('touchend', handleJoystickEnd);
+        wrapper.addEventListener('mousedown', handleJoystickStart);
+        window.addEventListener('mousemove', handleJoystickMove);
+        window.addEventListener('mouseup', handleJoystickEnd);
 
+        // --- 視角旋轉控制邏輯 (修正平板支援) ---
         const touchArea = document.getElementById('touch-controls');
-        touchArea.addEventListener('mousedown', (e) => { if (!isBattle && !e.target.closest('#joystick-wrapper')) { isRotating = true; lastMouseX = e.clientX; } });
-        window.addEventListener('mousemove', (e) => { if (isRotating) { cameraRotation -= (e.clientX - lastMouseX) * 0.01; lastMouseX = e.clientX; } });
-        window.addEventListener('mouseup', () => isRotating = false);
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        
+        const handleRotationStart = (e) => {
+            if (isBattle) return;
+            const target = e.target;
+            // 排除搖桿區域以及 UI 按鈕
+            if (target.closest('#joystick-wrapper') || target.closest('.battle-overlay') || target.closest('button')) return;
+            
+            isRotating = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            lastTouchX = clientX;
+        };
+
+        const handleRotationMove = (e) => {
+            if (!isRotating || isBattle) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const deltaX = clientX - lastTouchX;
+            cameraRotation -= deltaX * 0.01;
+            lastTouchX = clientX;
+        };
+
+        const handleRotationEnd = () => {
+            isRotating = false;
+        };
+
+        // 滑鼠旋轉
+        touchArea.addEventListener('mousedown', handleRotationStart);
+        window.addEventListener('mousemove', handleRotationMove);
+        window.addEventListener('mouseup', handleRotationEnd);
+        
+        // 觸控旋轉 (平板)
+        touchArea.addEventListener('touchstart', handleRotationStart, { passive: true });
+        window.addEventListener('touchmove', handleRotationMove, { passive: false });
+        window.addEventListener('touchend', handleRotationEnd);
+
+        window.addEventListener('resize', () => { 
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+        });
         
         animate();
     }
@@ -295,7 +343,6 @@
                 renderOptions({ w: 0, n: impNum, d: den });
             }
         } else {
-            // 比大小邏輯 (藍色史萊姆)
             const den = Math.floor(Math.random() * 5) + 5;
             let val1 = { w: Math.floor(Math.random() * 3) + 1, n: Math.floor(Math.random() * (den-1)) + 1, d: den };
             let val2;
@@ -313,7 +360,6 @@
             mathQuest.innerHTML = `<div class="flex gap-8 items-center">${leftHTML} <span class="text-gray-300">?</span> ${rightHTML}</div>`;
             
             const correct = v1_total > v2_total ? val1 : val2;
-            // 修正選項：選項格式必須與題目顯示的格式完全一致 (不予換算提示)
             renderOptionsForComparison(
                 { val: val1, asImp: showV1AsImp }, 
                 { val: val2, asImp: !showV1AsImp }, 
@@ -343,7 +389,6 @@
         });
     }
 
-    // 調整後的選項渲染函式
     function renderOptionsForComparison(item1, item2, correct) {
         const optContainer = document.getElementById('answer-options');
         optContainer.innerHTML = '';
@@ -352,7 +397,6 @@
             const v = item.val;
             const btn = document.createElement('button');
             btn.className = 'ans-btn';
-            // 使用題目中對應的格式 (asImp) 來渲染按鈕內容，避免學生看到「已換算」的提示
             btn.innerHTML = item.asImp ? getFractionHTML(v.w * v.d + v.n, v.d) : getFractionHTML(v.n, v.d, v.w);
             btn.onclick = () => { 
                 if(v.w === correct.w && v.n === correct.n) handleWin(); 
