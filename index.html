@@ -189,7 +189,7 @@
     </div>
 
     <div id="instruction-text">
-        使用左邊羅盤控制前進方向；滑動右邊螢幕可調整視角
+        雙手並用：左手控制移動，右手滑動螢幕旋轉視角
     </div>
 
     <div id="joystick-wrapper">
@@ -212,8 +212,8 @@
     let scene, camera, renderer, player, slimes = [];
     let isBattle = false, currentSlime = null;
     let moveSpeed = 0.4, cameraRotation = 0, cameraDistance = 40, cameraHeight = 28; 
-    let isRotating = false, lastTouchX = 0;
-    let joystickActive = false, joystickData = { x: 0, y: 0 };
+    let isRotating = false, lastTouchX = 0, rotationTouchId = null;
+    let joystickActive = false, joystickData = { x: 0, y: 0 }, joystickTouchId = null;
     let stats = { lv: 1, exp: 0, maxExp: 100, gold: 0 };
 
     function init() {
@@ -241,76 +241,100 @@
         createSlimes(30); 
         updateUI();
 
-        // --- 虛擬搖桿控制邏輯 ---
         const stick = document.getElementById('joystick-stick');
         const wrapper = document.getElementById('joystick-wrapper');
-        
-        const handleJoystickStart = (e) => { 
-            if (isBattle) return;
-            joystickActive = true; 
-            if(e.cancelable) e.preventDefault(); 
-        };
-        
-        const handleJoystickMove = (e) => {
-            if (!joystickActive || isBattle) return;
-            const touch = e.touches ? e.touches[0] : e;
-            const rect = wrapper.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2;
-            let dx = touch.clientX - centerX, dy = touch.clientY - centerY;
-            const dist = Math.sqrt(dx * dx + dy * dy), maxRadius = rect.width / 2;
-            if (dist > maxRadius) { dx *= maxRadius / dist; dy *= maxRadius / dist; }
-            stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-            joystickData.x = dx / maxRadius; joystickData.y = dy / maxRadius;
-        };
-        
-        const handleJoystickEnd = () => { 
-            joystickActive = false; 
-            stick.style.transform = 'translate(-50%, -50%)'; 
-            joystickData = {x:0, y:0}; 
-        };
-        
-        wrapper.addEventListener('touchstart', handleJoystickStart, { passive: false });
-        window.addEventListener('touchmove', handleJoystickMove, { passive: false });
-        window.addEventListener('touchend', handleJoystickEnd);
-        wrapper.addEventListener('mousedown', handleJoystickStart);
-        window.addEventListener('mousemove', handleJoystickMove);
-        window.addEventListener('mouseup', handleJoystickEnd);
-
-        // --- 視角旋轉控制邏輯 (修正平板支援) ---
         const touchArea = document.getElementById('touch-controls');
+
+        // --- 綜合觸控管理 (支援多點觸控) ---
         
-        const handleRotationStart = (e) => {
+        const handleTouchStart = (e) => {
             if (isBattle) return;
-            const target = e.target;
-            // 排除搖桿區域以及 UI 按鈕
-            if (target.closest('#joystick-wrapper') || target.closest('.battle-overlay') || target.closest('button')) return;
             
-            isRotating = true;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            lastTouchX = clientX;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = touch.target;
+
+                // 判斷是否點擊搖桿區域
+                if (target.closest('#joystick-wrapper')) {
+                    if (joystickTouchId === null) {
+                        joystickTouchId = touch.identifier;
+                        joystickActive = true;
+                    }
+                } 
+                // 否則視為旋轉視角 (需排除 UI)
+                else if (!target.closest('.battle-overlay') && !target.closest('button')) {
+                    if (rotationTouchId === null) {
+                        rotationTouchId = touch.identifier;
+                        isRotating = true;
+                        lastTouchX = touch.clientX;
+                    }
+                }
+            }
         };
 
-        const handleRotationMove = (e) => {
-            if (!isRotating || isBattle) return;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const deltaX = clientX - lastTouchX;
-            cameraRotation -= deltaX * 0.01;
-            lastTouchX = clientX;
+        const handleTouchMove = (e) => {
+            if (isBattle) return;
+            
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+
+                // 處理搖桿移動
+                if (touch.identifier === joystickTouchId) {
+                    const rect = wrapper.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2;
+                    let dx = touch.clientX - centerX, dy = touch.clientY - centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy), maxRadius = rect.width / 2;
+                    if (dist > maxRadius) { dx *= maxRadius / dist; dy *= maxRadius / dist; }
+                    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    joystickData.x = dx / maxRadius; joystickData.y = dy / maxRadius;
+                }
+                
+                // 處理視角旋轉
+                if (touch.identifier === rotationTouchId) {
+                    const deltaX = touch.clientX - lastTouchX;
+                    cameraRotation -= deltaX * 0.01;
+                    lastTouchX = touch.clientX;
+                }
+            }
+            if(e.cancelable) e.preventDefault();
         };
 
-        const handleRotationEnd = () => {
-            isRotating = false;
+        const handleTouchEnd = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === joystickTouchId) {
+                    joystickTouchId = null;
+                    joystickActive = false;
+                    stick.style.transform = 'translate(-50%, -50%)';
+                    joystickData = {x:0, y:0};
+                }
+                if (touch.identifier === rotationTouchId) {
+                    rotationTouchId = null;
+                    isRotating = false;
+                }
+            }
         };
 
-        // 滑鼠旋轉
-        touchArea.addEventListener('mousedown', handleRotationStart);
-        window.addEventListener('mousemove', handleRotationMove);
-        window.addEventListener('mouseup', handleRotationEnd);
-        
-        // 觸控旋轉 (平板)
-        touchArea.addEventListener('touchstart', handleRotationStart, { passive: true });
-        window.addEventListener('touchmove', handleRotationMove, { passive: false });
-        window.addEventListener('touchend', handleRotationEnd);
+        // 綁定觸控事件到全局
+        window.addEventListener('touchstart', handleTouchStart, { passive: false });
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleTouchEnd);
+        window.addEventListener('touchcancel', handleTouchEnd);
+
+        // 保留滑鼠支援 (用於電腦測試)
+        touchArea.addEventListener('mousedown', (e) => {
+            if (!isBattle && !e.target.closest('#joystick-wrapper')) {
+                isRotating = true;
+                lastTouchX = e.clientX;
+            }
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isRotating && !rotationTouchId) {
+                cameraRotation -= (e.clientX - lastTouchX) * 0.01;
+                lastTouchX = e.clientX;
+            }
+        });
+        window.addEventListener('mouseup', () => isRotating = false);
 
         window.addEventListener('resize', () => { 
             camera.aspect = window.innerWidth / window.innerHeight; 
