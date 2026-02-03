@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>積木數學王</title>
+    <!-- 引入 React 核心庫 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- 引入 Babel 用於解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Lucide 圖示 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #FFFCF0;
+            overflow-x: hidden;
+            margin: 0;
+        }
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        const Icon = ({ name, size = 24, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const App = () => {
+            const [gameState, setGameState] = useState('start');
+            const [difficulty, setDifficulty] = useState(1);
+            const [score, setScore] = useState(0);
+            const [currentQuestion, setCurrentQuestion] = useState(null);
+            const [showFeedback, setShowFeedback] = useState(null);
+            const [feedbackMessage, setFeedbackMessage] = useState('');
+
+            const colors = {
+                block1: '#E63946',
+                block2: '#457B9D',
+                block3: '#8338EC'
+            };
+
+            const praiseMessages = ["你很細心喔！", "你的觀念很清楚！", "努力的你真棒！", "認真的你最厲害！", "觀察得非常仔細！"];
+            const encouragingMessages = ["就差一點囉", "下一題繼續加油", "再仔細數數看", "再接再厲", "沒關係～再挑戰看看"];
+
+            const getRandom = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+            const createOneQuestion = useCallback((level) => {
+                const parts = [];
+                const blockColors = [colors.block1, colors.block2, colors.block3];
+                for (let j = 0; j < level; j++) {
+                    let a, b;
+                    do { a = getRandom(1, 10); b = getRandom(1, 8); } while (a === b);
+                    parts.push({ a, b, color: blockColors[j] });
+                }
+                const type = Math.random() > 0.5 ? 'formula-to-blocks' : 'blocks-to-formula';
+                const formulaStr = parts.map(p => `${p.a} × ${p.b}`).join(' + ');
+                const blockData = parts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
+                
+                const wrongParts = JSON.parse(JSON.stringify(parts));
+                const tempA = wrongParts[0].a;
+                wrongParts[0].a = wrongParts[0].b;
+                wrongParts[0].b = tempA;
+                const wrongFormulaStr = wrongParts.map(p => `${p.a} × ${p.b}`).join(' + ');
+                const wrongBlockData = wrongParts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
+                
+                const options = [
+                    { formula: formulaStr, blocks: blockData },
+                    { formula: wrongFormulaStr, blocks: wrongBlockData }
+                ].sort(() => Math.random() - 0.5);
+                
+                return { type, correctFormula: formulaStr, correctBlocks: blockData, options };
+            }, []);
+
+            const selectDifficulty = (level) => {
+                setDifficulty(level);
+                setScore(0);
+                setCurrentQuestion(createOneQuestion(level));
+                setGameState('playing');
+                setShowFeedback(null);
+            };
+
+            const handleAnswer = (selectedOption) => {
+                if (showFeedback) return;
+                const isCorrect = selectedOption.formula === currentQuestion.correctFormula;
+                
+                if (isCorrect) {
+                    const newScore = score + 1;
+                    setScore(newScore);
+                    setFeedbackMessage(praiseMessages[Math.floor(Math.random() * praiseMessages.length)]);
+                    setShowFeedback('correct');
+                    
+                    setTimeout(() => {
+                        if (newScore >= 10) {
+                            setGameState('finished');
+                        } else {
+                            setCurrentQuestion(createOneQuestion(difficulty));
+                            setShowFeedback(null);
+                        }
+                    }, 1200);
+                } else {
+                    setFeedbackMessage(encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]);
+                    setShowFeedback('incorrect');
+                    
+                    setTimeout(() => {
+                        setCurrentQuestion(createOneQuestion(difficulty));
+                        setShowFeedback(null);
+                    }, 1200);
+                }
+            };
+
+            const ScaledBlock = ({ size, color }) => (
+                <div className="flex flex-col-reverse w-6 md:w-8 border-2 border-black/10 rounded-lg shadow-[0_2px_0_rgba(0,0,0,0.15)] overflow-hidden" style={{ backgroundColor: color, height: `${size * 16}px` }}>
+                    {Array.from({ length: size }).map((_, i) => (
+                        <div key={i} className="h-[16px] w-full border-t-2 border-black/5 flex items-center justify-center">
+                            <div className="w-1 h-1 bg-white/30 rounded-full" />
+                        </div>
+                    ))}
+                </div>
+            );
+
+            const BlockDisplay = ({ config, isOption = false }) => (
+                <div className={`flex flex-row flex-wrap gap-4 md:gap-6 justify-center items-end p-4 md:p-6 rounded-[2rem] border-4 transition-all ${isOption ? 'bg-white border-slate-100' : 'bg-[#FFF9E6] border-[#FFD700] min-h-[140px]'}`}>
+                    {config.map((section, sIdx) => (
+                        <div key={sIdx} className="flex flex-row items-end gap-2 relative">
+                            <div className="flex flex-row gap-1 items-end">
+                                {Array.from({ length: section.blockCount }).map((_, bIdx) => (
+                                    <ScaledBlock key={bIdx} size={section.blockSize} color={section.color} />
+                                ))}
+                            </div>
+                            {sIdx < config.length - 1 && <div className="mx-1 mb-4 text-xl font-black text-[#FF8008]">+</div>}
+                        </div>
+                    ))}
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-4xl bg-white rounded-[3rem] shadow-[0_15px_0_#E0E0E0,0_30px_50px_-12px_rgba(0,0,0,0.2)] overflow-hidden border-[6px] border-[#4776E6] flex flex-col relative">
+                        <div className="bg-[#4776E6] p-4 md:p-5 text-white flex justify-between items-center border-b-[4px] border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-[#FFD700] p-2 rounded-xl">
+                                    <Icon name="zap" className="text-white fill-white" size={20} />
+                                </div>
+                                <h1 className="text-lg md:text-xl font-black italic">積木數學王</h1>
+                            </div>
+                            {gameState === 'playing' && (
+                                <div className="flex items-center gap-4">
+                                    <div className="text-white/80 font-bold text-sm hidden md:block">進度：{score} / 10</div>
+                                    <div className="bg-[#FFD700] text-[#B8860B] px-4 py-1.5 rounded-xl font-black text-lg shadow-[0_3px_0_#B8860B] flex items-center gap-2">
+                                        <Icon name="star" className="fill-[#B8860B]" size={18} /> {score * 10} 分
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-grow p-6 md:p-10 flex flex-col justify-center min-h-[450px]">
+                            {gameState === 'start' && (
+                                <div className="text-center py-10">
+                                    <h2 className="text-4xl md:text-5xl font-black mb-10 text-[#2B2D42]">準備好開始挑戰了嗎？</h2>
+                                    <button onClick={() => setGameState('difficulty')} className="bg-[#FF8008] text-white text-2xl font-black py-5 px-12 rounded-[2rem] shadow-[0_8px_0_#CC6600] active:translate-y-1 transition-all">
+                                        立即開始！
+                                    </button>
+                                </div>
+                            )}
+
+                            {gameState === 'difficulty' && (
+                                <div className="text-center">
+                                    <h2 className="text-3xl font-black mb-10 text-[#2B2D42]">請選擇挑戰難度</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {[
+                                            { lv: 1, title: '初級戰士', desc: '1 組積木', color: '#4CD964', shadow: '#38A14A' },
+                                            { lv: 2, title: '中級高手', desc: '2 組積木', color: '#4776E6', shadow: '#2A4494' },
+                                            { lv: 3, title: '傳說大師', desc: '3 組積木', color: '#8338EC', shadow: '#5B21B1' }
+                                        ].map((item) => (
+                                            <button key={item.lv} onClick={() => selectDifficulty(item.lv)} className="p-6 rounded-[2rem] text-white flex flex-col items-center gap-2 transition-all hover:-translate-y-2 active:translate-y-1" style={{ backgroundColor: item.color, boxShadow: `0 8px 0 ${item.shadow}` }}>
+                                                <span className="text-base font-bold opacity-80 mb-1">難度 {item.lv}</span>
+                                                <span className="text-xl font-black">{item.title}</span>
+                                                <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full mt-2">{item.desc}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {gameState === 'playing' && currentQuestion && (
+                                <div className="space-y-8">
+                                    <div className="text-center">
+                                        {currentQuestion.type === 'formula-to-blocks' ? (
+                                            <div className="space-y-4">
+                                                <p className="text-[#4776E6] font-black text-lg">找出對應這個算式的積木：</p>
+                                                <div className="inline-block px-8 py-5 bg-[#EEF2FF] rounded-[2rem] border-4 border-[#4776E6] shadow-[0_6px_0_#DDE4FF]">
+                                                    <h2 className={`font-black text-[#4776E6] ${difficulty === 3 ? 'text-2xl md:text-3xl' : 'text-4xl md:text-6xl'}`}>{currentQuestion.correctFormula}</h2>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <p className="text-[#FF8008] font-black text-lg">這對應哪個算式呢？</p>
+                                                <BlockDisplay config={currentQuestion.correctBlocks} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {currentQuestion.options.map((option, idx) => (
+                                            <button key={idx} onClick={() => handleAnswer(option)} disabled={showFeedback !== null} className={`p-4 border-4 rounded-[2rem] transition-all relative min-h-[120px] flex items-center justify-center
+                                                ${showFeedback === null ? 'border-slate-100 bg-white shadow-[0_8px_0_#F1F3F5] hover:border-[#4776E6]' : ''}
+                                                ${showFeedback === 'correct' && option.formula === currentQuestion.correctFormula ? 'border-[#4CD964] bg-[#F1FFF3] shadow-[0_8px_0_#4CD964]' : ''}
+                                                ${showFeedback === 'incorrect' && option.formula !== currentQuestion.correctFormula ? 'border-[#FF8008] bg-[#FFF9EE] shadow-[0_8px_0_#FF8008]' : ''}
+                                                ${showFeedback !== null && option.formula === currentQuestion.correctFormula ? 'opacity-100' : showFeedback !== null ? 'opacity-40' : ''}
+                                            `}>
+                                                {currentQuestion.type === 'formula-to-blocks' ? (
+                                                    <div className="scale-75 md:scale-90 origin-center">
+                                                        <BlockDisplay config={option.blocks} isOption={true} />
+                                                    </div>
+                                                ) : (
+                                                    <span className={`font-black text-[#2B2D42] ${difficulty === 3 ? 'text-lg md:text-2xl' : 'text-3xl md:text-5xl'}`}>{option.formula}</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="h-12 flex items-center justify-center text-center">
+                                        {showFeedback && (
+                                            <div className={`flex items-center gap-3 text-2xl md:text-3xl font-black animate-bounce ${showFeedback === 'correct' ? 'text-[#4CD964]' : 'text-[#FF8008]'}`}>
+                                                <Icon name={showFeedback === 'correct' ? "check-circle-2" : "lightbulb"} className="text-white fill-current" size={32} /> {feedbackMessage}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {gameState === 'finished' && (
+                                <div className="text-center py-6 bg-[#FFFCF0] rounded-[3rem] border-8 border-[#FFD700] shadow-xl fade-in-up">
+                                    <Icon name="party-popper" size={80} className="text-[#FFD700] mx-auto mb-4" />
+                                    <h2 className="text-3xl font-black mb-2 text-[#2B2D42]">挑戰成功！獲得 100 分！</h2>
+                                    <p className="text-lg font-bold text-[#4CD964] mb-6">你真的太棒了，完全掌握了這個難度！</p>
+                                    <div className="flex flex-col md:flex-row gap-4 justify-center px-6">
+                                        <button onClick={() => selectDifficulty(difficulty)} className="bg-[#FF8008] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#CC6600] active:translate-y-1">再次練習</button>
+                                        {difficulty < 3 ? (
+                                            <button onClick={() => selectDifficulty(difficulty + 1)} className="bg-[#4CD964] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#38A14A] active:translate-y-1 flex items-center justify-center gap-2">
+                                                下一關難度 {difficulty + 1} <Icon name="chevron-right" size={20} />
+                                            </button>
+                                        ) : (
+                                            <div className="bg-[#8338EC] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#5B21B1] flex items-center gap-2">
+                                                <Icon name="award" size={20} /> 全難度制霸！
+                                            </div>
+                                        )}
+                                        <button onClick={() => setGameState('difficulty')} className="bg-[#4776E6] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#2A4494] active:translate-y-1">回選單</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
