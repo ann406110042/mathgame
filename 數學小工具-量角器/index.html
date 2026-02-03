@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動雙量角器工具 - 完整刻度版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            touch-action: none;
+            user-select: none;
+        }
+        .protractor-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 24px;
+            margin-bottom: 2rem;
+        }
+        canvas {
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 font-sans text-gray-800">
+
+    <div class="max-w-4xl mx-auto text-center mb-8">
+        <h1 class="text-3xl font-bold text-slate-800">數學工具：雙刻度量角器對照</h1>
+        <p class="text-gray-500 mt-2">兩個量角器皆包含內、外圈刻度，並會自動填滿拖動的角度區域</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- 第一個量角器：外圈重點 -->
+        <div class="protractor-card border-t-4 border-blue-500">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-blue-600">量角器 A (藍色指針)</h2>
+                <div class="flex gap-2">
+                    <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+                        外圈：<span id="blueOuterDisplay">0</span>°
+                    </span>
+                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">
+                        內圈：<span id="blueInnerDisplay">180</span>°
+                    </span>
+                </div>
+            </div>
+            <canvas id="canvasA"></canvas>
+            <div class="mt-4 text-center">
+                <button onclick="resetA()" class="px-4 py-1 bg-blue-50 text-blue-600 rounded-full text-sm hover:bg-blue-100 transition border border-blue-100">重設位置</button>
+            </div>
+        </div>
+
+        <!-- 第二個量角器：內圈重點 -->
+        <div class="protractor-card border-t-4 border-red-500">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-red-600">量角器 B (紅色指針)</h2>
+                <div class="flex gap-2">
+                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">
+                        內圈：<span id="redInnerDisplay">0</span>°
+                    </span>
+                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">
+                        外圈：<span id="redOuterDisplay">180</span>°
+                    </span>
+                </div>
+            </div>
+            <canvas id="canvasB"></canvas>
+            <div class="mt-4 text-center">
+                <button onclick="resetB()" class="px-4 py-1 bg-red-50 text-red-600 rounded-full text-sm hover:bg-red-100 transition border border-red-100">重設位置</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const config = {
+            width: 500,
+            height: 300,
+            radius: 220,
+            get centerX() { return this.width / 2 },
+            get centerY() { return this.height - 40 }
+        };
+
+        class Protractor {
+            constructor(canvasId, outerDispId, innerDispId, pointerColor, fillColor, startSide) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.outerDisp = document.getElementById(outerDispId);
+                this.innerDisp = document.getElementById(innerDispId);
+                this.pointerColor = pointerColor;
+                this.fillColor = fillColor;
+                
+                this.canvas.width = config.width;
+                this.canvas.height = config.height;
+                
+                this.startSide = startSide; // 'left' or 'right'
+                this.angle = (startSide === 'left') ? Math.PI : 0;
+                this.isDragging = false;
+
+                this.initEvents();
+                this.draw();
+            }
+
+            initEvents() {
+                const getPos = (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const scaleX = config.width / rect.width;
+                    const scaleY = config.height / rect.height;
+                    return { 
+                        x: (clientX - rect.left) * scaleX, 
+                        y: (clientY - rect.top) * scaleY 
+                    };
+                };
+
+                const start = (e) => {
+                    const pos = getPos(e);
+                    const dx = pos.x - config.centerX;
+                    const dy = pos.y - config.centerY;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist > 10 && dist < config.radius + 40) this.isDragging = true;
+                };
+
+                const move = (e) => {
+                    if (!this.isDragging) return;
+                    if (e.cancelable) e.preventDefault();
+                    const pos = getPos(e);
+                    let a = Math.atan2(pos.y - config.centerY, pos.x - config.centerX);
+                    
+                    // 限制在量角器上半圓盤區域
+                    if (a > 0 && a < Math.PI / 2) a = 0;
+                    if (a >= Math.PI / 2) a = Math.PI;
+                    
+                    this.angle = a;
+                    this.draw();
+                };
+
+                const end = () => this.isDragging = false;
+
+                this.canvas.addEventListener('mousedown', start);
+                window.addEventListener('mousemove', move);
+                window.addEventListener('mouseup', end);
+                
+                this.canvas.addEventListener('touchstart', start, { passive: false });
+                window.addEventListener('touchmove', move, { passive: false });
+                window.addEventListener('touchend', end);
+            }
+
+            draw() {
+                const { ctx, pointerColor, fillColor, startSide } = this;
+                const { centerX, centerY, radius } = config;
+
+                ctx.clearRect(0, 0, config.width, config.height);
+
+                // 1. 繪製半圓底圖
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, Math.PI, 0);
+                ctx.lineTo(centerX, centerY);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.strokeStyle = "#94a3b8";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // 2. 繪製填滿的角度扇形
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                const baseAngle = (startSide === 'left') ? Math.PI : 0;
+                // arc(x, y, radius, startAngle, endAngle, counterclockwise)
+                // 畫布座標中 0 是右，PI 是左
+                ctx.arc(centerX, centerY, radius, baseAngle, this.angle, (startSide === 'right'));
+                ctx.lineTo(centerX, centerY);
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.restore();
+
+                // 3. 繪製刻度
+                for (let i = 0; i <= 180; i++) {
+                    const rad = (i * Math.PI) / 180;
+                    const isMajor = i % 10 === 0;
+                    const isMedium = i % 5 === 0 && !isMajor;
+                    const tickLen = isMajor ? 24 : (isMedium ? 14 : 8);
+
+                    ctx.beginPath();
+                    const xStart = centerX + radius * Math.cos(-rad);
+                    const yStart = centerY + radius * Math.sin(-rad);
+                    const xEnd = centerX + (radius - tickLen) * Math.cos(-rad);
+                    const yEnd = centerY + (radius - tickLen) * Math.sin(-rad);
+
+                    ctx.moveTo(xStart, yStart);
+                    ctx.lineTo(xEnd, yEnd);
+                    ctx.strokeStyle = isMajor ? "#334155" : "#cbd5e1";
+                    ctx.lineWidth = isMajor ? 1.5 : 1;
+                    ctx.stroke();
+
+                    if (isMajor) {
+                        ctx.font = "bold 13px Arial";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        
+                        const outerR = radius - 48;
+                        const ox = centerX + outerR * Math.cos(-rad);
+                        const oy = centerY + outerR * Math.sin(-rad);
+                        ctx.fillStyle = "#1e293b";
+                        ctx.fillText(180 - i, ox, oy);
+
+                        const innerR = radius - 75;
+                        const ix = centerX + innerR * Math.cos(-rad);
+                        const iy = centerY + innerR * Math.sin(-rad);
+                        ctx.fillStyle = "#94a3b8";
+                        ctx.fillText(i, ix, iy);
+                    }
+                }
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = "#000";
+                ctx.fill();
+
+                // 4. 繪製互動指針
+                const targetX = centerX + (radius - 5) * Math.cos(this.angle);
+                const targetY = centerY + (radius - 5) * Math.sin(this.angle);
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(targetX, targetY);
+                ctx.strokeStyle = pointerColor;
+                ctx.lineWidth = 4;
+                ctx.lineCap = "round";
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(targetX, targetY, 10, 0, Math.PI * 2);
+                ctx.fillStyle = pointerColor;
+                ctx.fill();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 5. 更新數值顯示
+                let degFromRight = Math.abs(Math.round(this.angle * 180 / Math.PI));
+                let outerVal = 180 - degFromRight;
+                let innerVal = degFromRight;
+
+                this.outerDisp.innerText = outerVal;
+                this.innerDisp.innerText = innerVal;
+            }
+        }
+
+        // 初始化量角器 A (外圈/左起) 與 B (內圈/右起)
+        // 加上了半透明填滿顏色 (RGBA)
+        const pA = new Protractor('canvasA', 'blueOuterDisplay', 'blueInnerDisplay', '#3b82f6', 'rgba(59, 130, 246, 0.2)', 'left');
+        const pB = new Protractor('canvasB', 'redOuterDisplay', 'redInnerDisplay', '#ef4444', 'rgba(239, 68, 68, 0.2)', 'right');
+
+        function resetA() { pA.angle = Math.PI; pA.draw(); }
+        function resetB() { pB.angle = 0; pB.draw(); }
+    </script>
+</body>
+</html>
