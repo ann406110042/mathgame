@@ -3,30 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>積木數學王</title>
-    <!-- 引入 React 核心庫 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <!-- 引入 Babel 用於解析 JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
-    <!-- 引入 Tailwind CSS -->
+    <title>積木數學王 - 乘法直觀化練習</title>
+    <!-- 引入 React 與 Tailwind -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Lucide 圖示 -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background-color: #FFFCF0;
-            overflow-x: hidden;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
             margin: 0;
+            overflow-x: hidden;
         }
-        .fade-in-up {
-            animation: fadeInUp 0.6s ease-out forwards;
+        .block-shadow {
+            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.1), inset 4px 4px 0px rgba(255,255,255,0.3);
         }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .pop-in {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
     </style>
 </head>
@@ -34,238 +33,309 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+        const { useState, useEffect, useCallback, useMemo } = React;
 
-        const Icon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [name]);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        // --- 簡易 Svg 圖示組件 ---
+        const SvgIcon = ({ name, className = "w-6 h-6" }) => {
+            const icons = {
+                zap: <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
+                star: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
+                award: (
+                    <>
+                        <circle cx="12" cy="8" r="7" />
+                        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+                    </>
+                ),
+                refresh: (
+                    <>
+                        <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                        <polyline points="21 3 21 8 16 8" />
+                    </>
+                ),
+                check: <polyline points="20 6 9 17 4 12" />,
+                lightbulb: (
+                    <>
+                        <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 008 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
+                        <path d="M9 18h6" />
+                        <path d="M10 22h4" />
+                    </>
+                ),
+                chevronLeft: <polyline points="15 18 9 12 15 6" />,
+                chevronRight: <polyline points="9 18 15 12 9 6" />
+            };
+            return (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name]}
+                </svg>
+            );
         };
 
         const App = () => {
-            const [gameState, setGameState] = useState('start');
+            const [gameState, setGameState] = useState('start'); // start, difficulty, playing, finished
             const [difficulty, setDifficulty] = useState(1);
-            const [score, setScore] = useState(0);
+            const [score, setScore] = useState(0); // 滿100分為止
             const [currentQuestion, setCurrentQuestion] = useState(null);
-            const [showFeedback, setShowFeedback] = useState(null);
-            const [feedbackMessage, setFeedbackMessage] = useState('');
+            const [feedback, setFeedback] = useState({ show: false, isCorrect: false, msg: '' });
 
-            const colors = {
-                block1: '#E63946',
-                block2: '#457B9D',
-                block3: '#8338EC'
+            const colors = ["#FF595E", "#1982C4", "#8AC926", "#FFCA3A", "#6A4C93"];
+            
+            // 答對時的肯定與努力稱讚
+            const praise = ["觀察入微！", "你的觀念很清楚", "努力的你真棒", "認真的你最厲害", "看得出來你很用心！"];
+            
+            // 答錯時的溫和鼓勵
+            const encourage = ["就差一點囉", "下一題繼續加油", "再仔細數數看", "再接再厲", "沒關係～再挑戰看看"];
+
+            const getRandomInRange = (min, max, exclude = null) => {
+                let val;
+                do {
+                    val = Math.floor(Math.random() * (max - min + 1)) + min;
+                } while (val === exclude);
+                return val;
             };
 
-            const praiseMessages = ["你很細心喔！", "你的觀念很清楚！", "努力的你真棒！", "認真的你最厲害！", "觀察得非常仔細！"];
-            const encouragingMessages = ["就差一點囉", "下一題繼續加油", "再仔細數數看", "再接再厲", "沒關係～再挑戰看看"];
-
-            const getRandom = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-            const createOneQuestion = useCallback((level) => {
+            const generateQuestion = useCallback((level) => {
                 const parts = [];
-                const blockColors = [colors.block1, colors.block2, colors.block3];
-                for (let j = 0; j < level; j++) {
-                    let a, b;
-                    do { a = getRandom(1, 10); b = getRandom(1, 8); } while (a === b);
-                    parts.push({ a, b, color: blockColors[j] });
+                for (let i = 0; i < level; i++) {
+                    const blockSize = Math.floor(Math.random() * 10) + 1; 
+                    const blockCount = getRandomInRange(1, 8, blockSize); 
+                    parts.push({ blockSize, blockCount, color: colors[i % colors.length] });
                 }
+
                 const type = Math.random() > 0.5 ? 'formula-to-blocks' : 'blocks-to-formula';
-                const formulaStr = parts.map(p => `${p.a} × ${p.b}`).join(' + ');
-                const blockData = parts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
+                const correctFormula = parts.map(p => `${p.blockSize} × ${p.blockCount}`).join(' + ');
                 
-                const wrongParts = JSON.parse(JSON.stringify(parts));
-                const tempA = wrongParts[0].a;
-                wrongParts[0].a = wrongParts[0].b;
-                wrongParts[0].b = tempA;
-                const wrongFormulaStr = wrongParts.map(p => `${p.a} × ${p.b}`).join(' + ');
-                const wrongBlockData = wrongParts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
-                
+                const wrongParts = parts.map((p, idx) => {
+                    if (idx === 0) {
+                        return { ...p, blockSize: p.blockCount, blockCount: p.blockSize };
+                    }
+                    return p;
+                });
+                const wrongFormula = wrongParts.map(p => `${p.blockSize} × ${p.blockCount}`).join(' + ');
+
                 const options = [
-                    { formula: formulaStr, blocks: blockData },
-                    { formula: wrongFormulaStr, blocks: wrongBlockData }
+                    { formula: correctFormula, blocks: parts },
+                    { formula: wrongFormula, blocks: wrongParts }
                 ].sort(() => Math.random() - 0.5);
-                
-                return { type, correctFormula: formulaStr, correctBlocks: blockData, options };
+
+                return { type, correctFormula, correctBlocks: parts, options };
             }, []);
 
-            const selectDifficulty = (level) => {
-                setDifficulty(level);
+            const startChallenge = (lv) => {
+                setDifficulty(lv);
                 setScore(0);
-                setCurrentQuestion(createOneQuestion(level));
+                setCurrentQuestion(generateQuestion(lv));
                 setGameState('playing');
-                setShowFeedback(null);
             };
 
-            const handleAnswer = (selectedOption) => {
-                if (showFeedback) return;
-                const isCorrect = selectedOption.formula === currentQuestion.correctFormula;
+            const handleAnswer = (option) => {
+                if (feedback.show) return;
+                const isCorrect = option.formula === currentQuestion.correctFormula;
                 
-                if (isCorrect) {
-                    const newScore = score + 1;
-                    setScore(newScore);
-                    setFeedbackMessage(praiseMessages[Math.floor(Math.random() * praiseMessages.length)]);
-                    setShowFeedback('correct');
+                setFeedback({
+                    show: true,
+                    isCorrect,
+                    msg: isCorrect ? praise[Math.floor(Math.random()*praise.length)] : encourage[Math.floor(Math.random()*encourage.length)]
+                });
+
+                setTimeout(() => {
+                    setFeedback({ show: false, isCorrect: false, msg: '' });
                     
-                    setTimeout(() => {
-                        if (newScore >= 10) {
+                    if (isCorrect) {
+                        const newScore = score + 10;
+                        if (newScore >= 100) {
+                            setScore(100);
                             setGameState('finished');
                         } else {
-                            setCurrentQuestion(createOneQuestion(difficulty));
-                            setShowFeedback(null);
+                            setScore(newScore);
+                            setCurrentQuestion(generateQuestion(difficulty));
                         }
-                    }, 1200);
-                } else {
-                    setFeedbackMessage(encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]);
-                    setShowFeedback('incorrect');
-                    
-                    setTimeout(() => {
-                        setCurrentQuestion(createOneQuestion(difficulty));
-                        setShowFeedback(null);
-                    }, 1200);
-                }
+                    } else {
+                        // 答錯不扣分，換一題繼續，直到答對滿10題
+                        setCurrentQuestion(generateQuestion(difficulty));
+                    }
+                }, 1500);
             };
 
-            const ScaledBlock = ({ size, color }) => (
-                <div className="flex flex-col-reverse w-6 md:w-8 border-2 border-black/10 rounded-lg shadow-[0_2px_0_rgba(0,0,0,0.15)] overflow-hidden" style={{ backgroundColor: color, height: `${size * 16}px` }}>
+            const Block = ({ size, color }) => (
+                <div 
+                    className="flex flex-col-reverse w-6 md:w-8 rounded-md block-shadow border border-black/10 overflow-hidden" 
+                    style={{ backgroundColor: color, height: `${size * 16}px` }}
+                >
                     {Array.from({ length: size }).map((_, i) => (
-                        <div key={i} className="h-[16px] w-full border-t-2 border-black/5 flex items-center justify-center">
-                            <div className="w-1 h-1 bg-white/30 rounded-full" />
+                        <div key={i} className="h-[16px] w-full border-t border-black/10 flex items-center justify-center">
+                            <div className="w-1 h-1 bg-white/20 rounded-full" />
                         </div>
                     ))}
                 </div>
             );
 
-            const BlockDisplay = ({ config, isOption = false }) => (
-                <div className={`flex flex-row flex-wrap gap-4 md:gap-6 justify-center items-end p-4 md:p-6 rounded-[2rem] border-4 transition-all ${isOption ? 'bg-white border-slate-100' : 'bg-[#FFF9E6] border-[#FFD700] min-h-[140px]'}`}>
-                    {config.map((section, sIdx) => (
-                        <div key={sIdx} className="flex flex-row items-end gap-2 relative">
-                            <div className="flex flex-row gap-1 items-end">
-                                {Array.from({ length: section.blockCount }).map((_, bIdx) => (
-                                    <ScaledBlock key={bIdx} size={section.blockSize} color={section.color} />
+            const BlockGroup = ({ config, isOption = false }) => (
+                <div className={`flex flex-wrap items-end justify-center gap-3 p-4 rounded-3xl transition-all ${isOption ? 'bg-white' : 'bg-amber-50 border-2 border-amber-200 shadow-inner'}`}>
+                    {config.map((group, gIdx) => (
+                        <div key={gIdx} className="flex items-end gap-1.5">
+                            <div className="flex gap-0.5 items-end">
+                                {Array.from({ length: group.blockCount }).map((_, bIdx) => (
+                                    <Block key={bIdx} size={group.blockSize} color={group.color} />
                                 ))}
                             </div>
-                            {sIdx < config.length - 1 && <div className="mx-1 mb-4 text-xl font-black text-[#FF8008]">+</div>}
+                            {gIdx < config.length - 1 && <span className="mb-2 text-xl font-black text-amber-500">+</span>}
                         </div>
                     ))}
                 </div>
             );
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                    <div className="w-full max-w-4xl bg-white rounded-[3rem] shadow-[0_15px_0_#E0E0E0,0_30px_50px_-12px_rgba(0,0,0,0.2)] overflow-hidden border-[6px] border-[#4776E6] flex flex-col relative">
-                        <div className="bg-[#4776E6] p-4 md:p-5 text-white flex justify-between items-center border-b-[4px] border-black/10">
+                <div className="min-h-screen p-4 md:p-8 flex items-center justify-center">
+                    <div className="w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl border-t-8 border-blue-500 overflow-hidden relative">
+                        
+                        <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <div className="bg-[#FFD700] p-2 rounded-xl">
-                                    <Icon name="zap" className="text-white fill-white" size={20} />
+                                <div className="bg-yellow-400 p-2 rounded-2xl shadow-lg">
+                                    <SvgIcon name="zap" className="w-6 h-6 text-blue-700 fill-current" />
                                 </div>
-                                <h1 className="text-lg md:text-xl font-black italic">積木數學王</h1>
+                                <h1 className="text-xl md:text-2xl font-black tracking-wider">積木數學王</h1>
                             </div>
                             {gameState === 'playing' && (
                                 <div className="flex items-center gap-4">
-                                    <div className="text-white/80 font-bold text-sm hidden md:block">進度：{score} / 10</div>
-                                    <div className="bg-[#FFD700] text-[#B8860B] px-4 py-1.5 rounded-xl font-black text-lg shadow-[0_3px_0_#B8860B] flex items-center gap-2">
-                                        <Icon name="star" className="fill-[#B8860B]" size={18} /> {score * 10} 分
+                                    <div className="bg-blue-500/50 px-3 md:px-4 py-1 rounded-full text-xs md:text-sm font-bold tracking-widest uppercase">
+                                        目標 100 分
+                                    </div>
+                                    <div className="bg-yellow-400 text-blue-900 px-3 md:px-4 py-1 rounded-full font-black flex items-center gap-2 text-sm md:text-base shadow-sm">
+                                        <SvgIcon name="star" className="w-4 h-4 fill-current" /> {score}
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex-grow p-6 md:p-10 flex flex-col justify-center min-h-[450px]">
+                        <div className="p-6 md:p-10 min-h-[550px] flex flex-col justify-center">
+                            
                             {gameState === 'start' && (
-                                <div className="text-center py-10">
-                                    <h2 className="text-4xl md:text-5xl font-black mb-10 text-[#2B2D42]">準備好開始挑戰了嗎？</h2>
-                                    <button onClick={() => setGameState('difficulty')} className="bg-[#FF8008] text-white text-2xl font-black py-5 px-12 rounded-[2rem] shadow-[0_8px_0_#CC6600] active:translate-y-1 transition-all">
-                                        立即開始！
+                                <div className="text-center pop-in">
+                                    <h2 className="text-4xl md:text-5xl font-black text-slate-800 mb-6">歡迎來到積木王國！</h2>
+                                    <p className="text-lg text-slate-500 mb-12">透過數積木，讓我們一起把乘法變簡單吧！</p>
+                                    <button 
+                                        onClick={() => setGameState('difficulty')}
+                                        className="bg-orange-500 hover:bg-orange-600 text-white text-2xl font-black py-6 px-16 rounded-full shadow-[0_8px_0_rgb(194,65,12)] active:translate-y-2 active:shadow-none transition-all"
+                                    >
+                                        立即開戰
                                     </button>
                                 </div>
                             )}
 
                             {gameState === 'difficulty' && (
-                                <div className="text-center">
-                                    <h2 className="text-3xl font-black mb-10 text-[#2B2D42]">請選擇挑戰難度</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="text-center pop-in">
+                                    <h2 className="text-3xl font-black text-slate-800 mb-10">選擇你的戰場</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                                         {[
-                                            { lv: 1, title: '初級戰士', desc: '1 組積木', color: '#4CD964', shadow: '#38A14A' },
-                                            { lv: 2, title: '中級高手', desc: '2 組積木', color: '#4776E6', shadow: '#2A4494' },
-                                            { lv: 3, title: '傳說大師', desc: '3 組積木', color: '#8338EC', shadow: '#5B21B1' }
-                                        ].map((item) => (
-                                            <button key={item.lv} onClick={() => selectDifficulty(item.lv)} className="p-6 rounded-[2rem] text-white flex flex-col items-center gap-2 transition-all hover:-translate-y-2 active:translate-y-1" style={{ backgroundColor: item.color, boxShadow: `0 8px 0 ${item.shadow}` }}>
-                                                <span className="text-base font-bold opacity-80 mb-1">難度 {item.lv}</span>
-                                                <span className="text-xl font-black">{item.title}</span>
-                                                <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full mt-2">{item.desc}</span>
+                                            { lv: 1, title: '初級戰士', desc: '單組積木 (A×B)', col: 'bg-emerald-500' },
+                                            { lv: 2, title: '中級高手', desc: '兩組加總 (+)', col: 'bg-blue-500' },
+                                            { lv: 3, title: '傳說大師', desc: '三組加總 (++)', col: 'bg-purple-500' }
+                                        ].map(item => (
+                                            <button 
+                                                key={item.lv}
+                                                onClick={() => startChallenge(item.lv)}
+                                                className={`${item.col} p-8 rounded-[2.5rem] text-white transition-all hover:-translate-y-2 active:translate-y-0 shadow-lg group`}
+                                            >
+                                                <div className="text-sm font-bold opacity-80 mb-1">難度 {item.lv}</div>
+                                                <div className="text-2xl font-black mb-2">{item.title}</div>
+                                                <div className="text-xs bg-black/20 rounded-full py-1 px-2 inline-block font-bold">{item.desc}</div>
                                             </button>
                                         ))}
                                     </div>
+                                    <button 
+                                        onClick={() => setGameState('start')}
+                                        className="text-slate-400 font-bold flex items-center gap-2 mx-auto hover:text-slate-600 transition-colors"
+                                    >
+                                        <SvgIcon name="chevronLeft" className="w-5 h-5" /> 返回首頁
+                                    </button>
                                 </div>
                             )}
 
                             {gameState === 'playing' && currentQuestion && (
-                                <div className="space-y-8">
+                                <div className="space-y-8 pop-in">
                                     <div className="text-center">
-                                        {currentQuestion.type === 'formula-to-blocks' ? (
-                                            <div className="space-y-4">
-                                                <p className="text-[#4776E6] font-black text-lg">找出對應這個算式的積木：</p>
-                                                <div className="inline-block px-8 py-5 bg-[#EEF2FF] rounded-[2rem] border-4 border-[#4776E6] shadow-[0_6px_0_#DDE4FF]">
-                                                    <h2 className={`font-black text-[#4776E6] ${difficulty === 3 ? 'text-2xl md:text-3xl' : 'text-4xl md:text-6xl'}`}>{currentQuestion.correctFormula}</h2>
+                                        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 font-black px-4 py-2 rounded-full mb-6 text-sm">
+                                            <SvgIcon name="lightbulb" className="w-4 h-4" /> 
+                                            {currentQuestion.type === 'formula-to-blocks' ? '觀察算式，找出正確的積木組合' : '觀察積木，找出對應的算式'}
+                                        </div>
+                                        
+                                        <div className="min-h-[160px] flex items-center justify-center">
+                                            {currentQuestion.type === 'formula-to-blocks' ? (
+                                                <div className="bg-white border-4 border-blue-100 rounded-[2rem] px-8 md:px-12 py-6 md:py-8 shadow-sm">
+                                                    <h3 className="text-3xl md:text-5xl font-black text-blue-700 tracking-tighter">
+                                                        {currentQuestion.correctFormula}
+                                                    </h3>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <p className="text-[#FF8008] font-black text-lg">這對應哪個算式呢？</p>
-                                                <BlockDisplay config={currentQuestion.correctBlocks} />
-                                            </div>
-                                        )}
+                                            ) : (
+                                                <BlockGroup config={currentQuestion.correctBlocks} />
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {currentQuestion.options.map((option, idx) => (
-                                            <button key={idx} onClick={() => handleAnswer(option)} disabled={showFeedback !== null} className={`p-4 border-4 rounded-[2rem] transition-all relative min-h-[120px] flex items-center justify-center
-                                                ${showFeedback === null ? 'border-slate-100 bg-white shadow-[0_8px_0_#F1F3F5] hover:border-[#4776E6]' : ''}
-                                                ${showFeedback === 'correct' && option.formula === currentQuestion.correctFormula ? 'border-[#4CD964] bg-[#F1FFF3] shadow-[0_8px_0_#4CD964]' : ''}
-                                                ${showFeedback === 'incorrect' && option.formula !== currentQuestion.correctFormula ? 'border-[#FF8008] bg-[#FFF9EE] shadow-[0_8px_0_#FF8008]' : ''}
-                                                ${showFeedback !== null && option.formula === currentQuestion.correctFormula ? 'opacity-100' : showFeedback !== null ? 'opacity-40' : ''}
-                                            `}>
+                                        {currentQuestion.options.map((opt, i) => (
+                                            <button 
+                                                key={i}
+                                                onClick={() => handleAnswer(opt)}
+                                                disabled={feedback.show}
+                                                className={`p-4 border-4 rounded-[2.5rem] transition-all flex items-center justify-center min-h-[150px] overflow-hidden
+                                                    ${!feedback.show ? 'bg-white border-slate-100 hover:border-blue-400 hover:bg-blue-50 shadow-md' : ''}
+                                                    ${feedback.show && opt.formula === currentQuestion.correctFormula ? 'bg-emerald-50 border-emerald-500 scale-105 shadow-xl' : ''}
+                                                    ${feedback.show && opt.formula !== currentQuestion.correctFormula ? 'bg-slate-50 border-slate-200 opacity-50' : ''}
+                                                `}
+                                            >
                                                 {currentQuestion.type === 'formula-to-blocks' ? (
-                                                    <div className="scale-75 md:scale-90 origin-center">
-                                                        <BlockDisplay config={option.blocks} isOption={true} />
-                                                    </div>
+                                                    <div className="scale-[0.6] md:scale-[0.75] origin-center"><BlockGroup config={opt.blocks} isOption /></div>
                                                 ) : (
-                                                    <span className={`font-black text-[#2B2D42] ${difficulty === 3 ? 'text-lg md:text-2xl' : 'text-3xl md:text-5xl'}`}>{option.formula}</span>
+                                                    <span className="text-2xl md:text-3xl font-black text-slate-700">{opt.formula}</span>
                                                 )}
                                             </button>
                                         ))}
                                     </div>
 
-                                    <div className="h-12 flex items-center justify-center text-center">
-                                        {showFeedback && (
-                                            <div className={`flex items-center gap-3 text-2xl md:text-3xl font-black animate-bounce ${showFeedback === 'correct' ? 'text-[#4CD964]' : 'text-[#FF8008]'}`}>
-                                                <Icon name={showFeedback === 'correct' ? "check-circle-2" : "lightbulb"} className="text-white fill-current" size={32} /> {feedbackMessage}
-                                            </div>
-                                        )}
+                                    <div className={`h-12 flex items-center justify-center transition-all duration-300 ${feedback.show ? 'opacity-100' : 'opacity-0'}`}>
+                                        <div className={`flex items-center gap-3 text-2xl font-black ${feedback.isCorrect ? 'text-emerald-500' : 'text-orange-500'}`}>
+                                            <SvgIcon name={feedback.isCorrect ? "check" : "lightbulb"} className="w-8 h-8" />
+                                            {feedback.msg}
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
                             {gameState === 'finished' && (
-                                <div className="text-center py-6 bg-[#FFFCF0] rounded-[3rem] border-8 border-[#FFD700] shadow-xl fade-in-up">
-                                    <Icon name="party-popper" size={80} className="text-[#FFD700] mx-auto mb-4" />
-                                    <h2 className="text-3xl font-black mb-2 text-[#2B2D42]">挑戰成功！獲得 100 分！</h2>
-                                    <p className="text-lg font-bold text-[#4CD964] mb-6">你真的太棒了，完全掌握了這個難度！</p>
-                                    <div className="flex flex-col md:flex-row gap-4 justify-center px-6">
-                                        <button onClick={() => selectDifficulty(difficulty)} className="bg-[#FF8008] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#CC6600] active:translate-y-1">再次練習</button>
-                                        {difficulty < 3 ? (
-                                            <button onClick={() => selectDifficulty(difficulty + 1)} className="bg-[#4CD964] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#38A14A] active:translate-y-1 flex items-center justify-center gap-2">
-                                                下一關難度 {difficulty + 1} <Icon name="chevron-right" size={20} />
+                                <div className="text-center py-8 md:py-10 pop-in bg-amber-50 rounded-[3rem] border-4 border-amber-200 shadow-xl max-w-2xl mx-auto w-full">
+                                    <div className="mb-6 inline-block bg-yellow-400 p-6 rounded-full">
+                                        <SvgIcon name="award" className="w-16 h-16 text-white" />
+                                    </div>
+                                    <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-4">
+                                        🎉 任務圓滿達成！
+                                    </h2>
+                                    <p className="text-2xl text-amber-600 font-bold mb-10">你已成功獲得滿分 100 分！</p>
+                                    
+                                    <div className="flex flex-col gap-4 px-6 md:px-12 items-center">
+                                        {difficulty < 3 && (
+                                            <button 
+                                                onClick={() => startChallenge(difficulty + 1)}
+                                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-5 px-10 rounded-2xl shadow-[0_6px_0_rgb(5,150,105)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 text-xl"
+                                            >
+                                                進入下一難度 <SvgIcon name="chevronRight" className="w-6 h-6" />
                                             </button>
-                                        ) : (
-                                            <div className="bg-[#8338EC] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#5B21B1] flex items-center gap-2">
-                                                <Icon name="award" size={20} /> 全難度制霸！
-                                            </div>
                                         )}
-                                        <button onClick={() => setGameState('difficulty')} className="bg-[#4776E6] text-white font-black py-4 px-8 rounded-2xl shadow-[0_5px_0_#2A4494] active:translate-y-1">回選單</button>
+                                        
+                                        <div className="grid grid-cols-2 gap-4 w-full">
+                                            <button 
+                                                onClick={() => setGameState('difficulty')}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-6 rounded-2xl shadow-[0_6px_0_rgb(37,99,235)] active:translate-y-1 active:shadow-none transition-all"
+                                            >
+                                                更換難度
+                                            </button>
+                                            <button 
+                                                onClick={() => startChallenge(difficulty)}
+                                                className="bg-orange-500 hover:bg-orange-600 text-white font-black py-4 px-6 rounded-2xl shadow-[0_6px_0_rgb(234,88,12)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <SvgIcon name="refresh" className="w-5 h-5" /> 重新挑戰
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
