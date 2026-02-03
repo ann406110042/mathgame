@@ -1,0 +1,344 @@
+import React, { useState, useEffect } from 'react';
+import { Trophy, Star, RefreshCcw, CheckCircle2, XCircle, LayoutGrid, ChevronRight, Award, Lightbulb, Smile, Zap, BarChart, PartyPopper, ArrowRight } from 'lucide-react';
+
+const App = () => {
+  const [gameState, setGameState] = useState('start'); // start, difficulty, playing, finished
+  const [difficulty, setDifficulty] = useState(1); // 1, 2, 3
+  const [score, setScore] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(null); // 'correct' or 'incorrect'
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const colors = {
+    bg: '#FFFCF0',
+    primary: '#4776E6',
+    secondary: '#FF8008',
+    accent: '#FFD700',
+    correct: '#4CD964',
+    wrong: '#FF8008',
+    block1: '#E63946', // 紅
+    block2: '#457B9D', // 藍
+    block3: '#8338EC', // 紫
+    cardBg: '#FFFFFF',
+    text: '#2B2D42'
+  };
+
+  // 鼓勵努力過程的語句 (答對時)
+  const praiseMessages = [
+    "你很細心喔！",
+    "你的觀念很清楚！",
+    "努力的你真棒！",
+    "認真的你最厲害！",
+    "觀察得非常仔細！"
+  ];
+
+  // 鼓勵再接再厲的語句 (答錯時)
+  const encouragingMessages = [
+    "就差一點囉",
+    "下一題繼續加油",
+    "再仔細數數看",
+    "再接再厲",
+    "沒關係～再挑戰看看"
+  ];
+
+  const getRandom = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+  // 生成單一題目
+  const createOneQuestion = (level) => {
+    const parts = [];
+    const config = [
+      { color: colors.block1 },
+      { color: colors.block2 },
+      { color: colors.block3 }
+    ];
+
+    for (let j = 0; j < level; j++) {
+      let a, b;
+      do {
+        a = getRandom(1, 10);
+        b = getRandom(1, 8);
+      } while (a === b);
+      parts.push({ a, b, color: config[j].color });
+    }
+
+    const type = Math.random() > 0.5 ? 'formula-to-blocks' : 'blocks-to-formula';
+    const formulaStr = parts.map(p => `${p.a} × ${p.b}`).join(' + ');
+    const blockData = parts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
+
+    const wrongParts = JSON.parse(JSON.stringify(parts));
+    const tempA = wrongParts[0].a;
+    wrongParts[0].a = wrongParts[0].b;
+    wrongParts[0].b = tempA;
+    
+    const wrongFormulaStr = wrongParts.map(p => `${p.a} × ${p.b}`).join(' + ');
+    const wrongBlockData = wrongParts.map(p => ({ blockSize: p.a, blockCount: p.b, color: p.color }));
+
+    const correctAnswer = { formula: formulaStr, blocks: blockData };
+    const wrongAnswer = { formula: wrongFormulaStr, blocks: wrongBlockData };
+    
+    const options = [correctAnswer, wrongAnswer].sort(() => Math.random() - 0.5);
+    
+    return {
+      type,
+      correctFormula: formulaStr,
+      correctBlocks: blockData,
+      options
+    };
+  };
+
+  const selectDifficulty = (level) => {
+    setDifficulty(level);
+    setScore(0);
+    setCurrentQuestion(createOneQuestion(level));
+    setGameState('playing');
+    setShowFeedback(null);
+  };
+
+  const handleAnswer = (selectedOption) => {
+    if (showFeedback) return;
+    const isCorrect = selectedOption.formula === currentQuestion.correctFormula;
+    
+    if (isCorrect) {
+      const newScore = score + 1;
+      setScore(newScore);
+      setFeedbackMessage(praiseMessages[Math.floor(Math.random() * praiseMessages.length)]);
+      setShowFeedback('correct');
+      
+      setTimeout(() => {
+        if (newScore >= 10) {
+          setGameState('finished');
+        } else {
+          setCurrentQuestion(createOneQuestion(difficulty));
+          setShowFeedback(null);
+        }
+      }, 1200);
+    } else {
+      setFeedbackMessage(encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]);
+      setShowFeedback('incorrect');
+      
+      setTimeout(() => {
+        setCurrentQuestion(createOneQuestion(difficulty));
+        setShowFeedback(null);
+      }, 1200);
+    }
+  };
+
+  const ScaledBlock = ({ size, color }) => (
+    <div 
+      className="flex flex-col-reverse w-6 md:w-8 border-2 border-black/10 rounded-lg shadow-[0_3px_0_rgba(0,0,0,0.15)] overflow-hidden"
+      style={{ backgroundColor: color, height: `${size * 18}px` }}
+    >
+      {Array.from({ length: size }).map((_, i) => (
+        <div key={i} className="h-[18px] w-full border-t-2 border-black/5 flex items-center justify-center">
+          <div className="w-1 h-1 bg-white/30 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const BlockDisplay = ({ config, isOption = false }) => (
+    <div className={`flex flex-row flex-wrap gap-4 md:gap-8 justify-center items-end p-4 md:p-6 rounded-[2rem] border-4 transition-all ${isOption ? 'bg-white border-slate-100' : 'bg-[#FFF9E6] border-[#FFD700] min-h-[160px]'}`}>
+      {config.map((section, sIdx) => (
+        <div key={sIdx} className="flex flex-row items-end gap-2 relative">
+          <div className="flex flex-row gap-1 md:gap-1.5 items-end">
+            {Array.from({ length: section.blockCount }).map((_, bIdx) => (
+              <ScaledBlock key={bIdx} size={section.blockSize} color={section.color} />
+            ))}
+          </div>
+          {sIdx < config.length - 1 && (
+            <div className="mx-1 md:mx-2 mb-4 text-2xl font-black text-[#FF8008]">
+              +
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#FFFCF0] flex flex-col items-center justify-center p-2 md:p-4 font-sans text-[#2B2D42]">
+      <div className="w-full max-w-5xl bg-white rounded-[3rem] shadow-[0_20px_0_#E0E0E0,0_40px_60px_-12px_rgba(0,0,0,0.25)] overflow-hidden border-[8px] border-[#4776E6] flex flex-col relative">
+        
+        {/* Header */}
+        <div className="bg-[#4776E6] p-4 md:p-6 text-white flex justify-between items-center shrink-0 border-b-[6px] border-black/10">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#FFD700] p-2 rounded-xl shadow-[0_3px_0_#B8860B]">
+              <Zap size={24} className="fill-white" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-black italic text-white">積木數學王</h1>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">挑戰目標：100分</p>
+            </div>
+          </div>
+          {gameState === 'playing' && (
+            <div className="flex items-center gap-3">
+               <div className="bg-[#FFD700] text-[#B8860B] px-4 py-1.5 rounded-xl font-black text-xl shadow-[0_3px_0_#B8860B] flex items-center gap-2">
+                 <Star size={20} className="fill-[#B8860B]" />
+                 {score * 10} / 100
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Game Body */}
+        <div className="flex-grow overflow-y-auto p-6 md:p-10 flex flex-col justify-center min-h-[500px]">
+          
+          {gameState === 'start' && (
+            <div className="text-center py-8 animate-in zoom-in duration-300">
+              <h2 className="text-4xl md:text-6xl font-black mb-8">積木倍數挑戰</h2>
+              <div className="flex flex-col gap-4 max-w-md mx-auto">
+                <button 
+                  onClick={() => setGameState('difficulty')}
+                  className="bg-[#FF8008] text-white text-2xl font-black py-6 rounded-[2rem] shadow-[0_8px_0_#CC6600] active:translate-y-1 active:shadow-none transition-all"
+                >
+                  進入挑戰！
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'difficulty' && (
+            <div className="text-center py-4 animate-in slide-in-from-bottom-8 duration-500">
+              <div className="flex justify-center mb-8"><BarChart size={64} className="text-[#4776E6]" /></div>
+              <h2 className="text-3xl font-black mb-8">請選擇挑戰難度</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {[
+                  { lv: 1, title: '初級戰士', desc: '1 組積木', color: '#4CD964', shadow: '#38A14A' },
+                  { lv: 2, title: '中級高手', desc: '2 組積木', color: '#4776E6', shadow: '#2A4494' },
+                  { lv: 3, title: '傳說大師', desc: '3 組積木', color: '#8338EC', shadow: '#5B21B1' }
+                ].map((item) => (
+                  <button
+                    key={item.lv}
+                    onClick={() => selectDifficulty(item.lv)}
+                    className="group p-8 rounded-[2.5rem] text-white flex flex-col items-center gap-2 transition-all hover:-translate-y-2 active:translate-y-1"
+                    style={{ backgroundColor: item.color, boxShadow: `0 10px 0 ${item.shadow}` }}
+                  >
+                    <span className="text-lg font-bold opacity-80 underline underline-offset-4 mb-2">難度 {item.lv}</span>
+                    <span className="text-2xl font-black">{item.title}</span>
+                    <span className="text-sm font-bold bg-white/20 px-4 py-1 rounded-full mt-2">{item.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {gameState === 'playing' && currentQuestion && (
+            <div className="space-y-6 md:space-y-10">
+              <div className="text-center">
+                <div className="mb-4 text-slate-400 font-bold text-lg">目前進度：已答對 {score} / 10 題</div>
+                {currentQuestion.type === 'formula-to-blocks' ? (
+                  <div className="space-y-4">
+                     <div className="flex items-center justify-center gap-2 text-[#4776E6] font-black text-sm uppercase">
+                        <Smile size={20} /> 目前題目
+                     </div>
+                     <div className="inline-block px-8 py-6 bg-[#EEF2FF] rounded-[2.5rem] border-4 border-[#4776E6] shadow-[0_8px_0_#DDE4FF]">
+                       <h2 className={`font-black text-[#4776E6] tracking-tighter ${difficulty === 3 ? 'text-2xl md:text-4xl' : 'text-5xl md:text-7xl'}`}>
+                         {currentQuestion.correctFormula}
+                       </h2>
+                     </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-[#FF8008] font-black text-lg uppercase tracking-widest">這對應哪個算式呢？</p>
+                    <div className={`${difficulty === 3 ? 'scale-90 md:scale-100' : 'scale-100 md:scale-110'}`}>
+                      <BlockDisplay config={currentQuestion.correctBlocks} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {currentQuestion.options.map((option, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleAnswer(option)}
+                    disabled={showFeedback !== null}
+                    className={`group p-6 border-4 rounded-[2.5rem] transition-all relative touch-manipulation
+                      ${showFeedback === null ? 'border-slate-100 bg-white shadow-[0_10px_0_#F1F3F5] hover:border-[#4776E6] hover:-translate-y-1' : ''}
+                      ${showFeedback === 'correct' && option.formula === currentQuestion.correctFormula ? 'border-[#4CD964] bg-[#F1FFF3] shadow-[0_10px_0_#4CD964]' : ''}
+                      ${showFeedback === 'incorrect' && option.formula !== currentQuestion.correctFormula ? 'border-[#FF8008] bg-[#FFF9EE] shadow-[0_10px_0_#FF8008]' : ''}
+                      ${showFeedback !== null && option.formula === currentQuestion.correctFormula ? 'opacity-100' : showFeedback !== null ? 'opacity-40' : ''}
+                    `}
+                  >
+                    {currentQuestion.type === 'formula-to-blocks' ? (
+                      <div className={`${difficulty === 3 ? 'scale-[0.55] md:scale-75' : 'scale-75 md:scale-90'} origin-center`}>
+                        <BlockDisplay config={option.blocks} isOption={true} />
+                      </div>
+                    ) : (
+                      <div className="py-6 flex items-center justify-center">
+                        <span className={`font-black text-[#2B2D42] ${difficulty === 3 ? 'text-xl md:text-3xl' : 'text-4xl md:text-6xl'}`}>
+                          {option.formula}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-16 flex items-center justify-center text-center">
+                {showFeedback && (
+                  <div className={`flex items-center gap-3 text-2xl md:text-4xl font-black animate-bounce
+                    ${showFeedback === 'correct' ? 'text-[#4CD964]' : 'text-[#FF8008]'}`}>
+                    {showFeedback === 'correct' ? (
+                      <><CheckCircle2 size={40} className="fill-[#4CD964] text-white" /> {feedbackMessage}</>
+                    ) : (
+                      <><Lightbulb size={40} className="fill-[#FF8008] text-white" /> {feedbackMessage}</>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {gameState === 'finished' && (
+            <div className="text-center py-8 bg-[#FFFCF0] rounded-[3rem] border-8 border-[#FFD700] shadow-xl mx-2 animate-in zoom-in duration-500">
+              <div className="flex flex-col items-center">
+                <PartyPopper size={100} className="text-[#FFD700] mb-4" />
+                <h2 className="text-4xl font-black text-[#2B2D42] mb-2">恭喜達成 100 分！</h2>
+                <p className="text-xl font-bold text-[#4CD964] mb-6">你已經完美掌握難度 {difficulty} 了！</p>
+              </div>
+              
+              <div className="mb-8">
+                 <span className="text-8xl font-black text-[#4776E6]">100</span>
+                 <span className="text-2xl font-black text-[#8D99AE] ml-2">分</span>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4 justify-center items-center px-4">
+                <button 
+                  onClick={() => selectDifficulty(difficulty)}
+                  className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#FF8008] text-white font-black py-5 px-10 rounded-[2rem] shadow-[0_8px_0_#CC6600] active:translate-y-1 active:shadow-none"
+                >
+                  <RefreshCcw size={24} /> 再次練習
+                </button>
+
+                {difficulty < 3 && (
+                  <button 
+                    onClick={() => selectDifficulty(difficulty + 1)}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#4CD964] text-white font-black py-5 px-10 rounded-[2rem] shadow-[0_8px_0_#38A14A] active:translate-y-1 active:shadow-none"
+                  >
+                    <ArrowRight size={24} /> 挑戰難度 {difficulty + 1}
+                  </button>
+                )}
+
+                {difficulty === 3 && (
+                  <div className="bg-[#8338EC] text-white font-black py-5 px-10 rounded-[2rem] shadow-[0_8px_0_#5B21B1] flex items-center gap-2">
+                    <Award size={24} /> 全難度制霸！
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => setGameState('difficulty')}
+                  className="w-full md:w-auto bg-[#4776E6] text-white font-black py-5 px-10 rounded-[2rem] shadow-[0_8px_0_#2A4494] active:translate-y-1 active:shadow-none"
+                >
+                  回難度選單
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
