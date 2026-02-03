@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>積木數學王 - 乘法直觀化練習</title>
+    <title>積木數學王</title>
     <!-- 引入 React 與 Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -80,10 +80,10 @@
             const colors = ["#FF595E", "#1982C4", "#8AC926", "#FFCA3A", "#6A4C93"];
             
             // 答對時的肯定與努力稱讚
-            const praise = ["觀察入微！", "你的觀念很清楚", "努力的你真棒", "認真的你最厲害", "看得出來你很用心！"];
+            const praise = ["觀察入微！", "你觀察得很仔細！", "你的觀念很清楚～", "努力的你真棒！", "認真的你最厲害！", "看得出來你很用心！"];
             
             // 答錯時的溫和鼓勵
-            const encourage = ["就差一點囉", "下一題繼續加油", "再仔細數數看", "再接再厲", "沒關係～再挑戰看看"];
+            const encourage = ["就差一點囉！", "下一題繼續加油！", "再仔細數數看！", "再接再厲～每題都是小小的進步", "沒關係～再挑戰看看"];
 
             const getRandomInRange = (min, max, exclude = null) => {
                 let val;
@@ -211,20 +211,20 @@
                             
                             {gameState === 'start' && (
                                 <div className="text-center pop-in">
-                                    <h2 className="text-4xl md:text-5xl font-black text-slate-800 mb-6">歡迎來到積木王國！</h2>
-                                    <p className="text-lg text-slate-500 mb-12">透過數積木，讓我們一起把乘法變簡單吧！</p>
+                                    <h2 className="text-4xl md:text-5xl font-black text-slate-800 mb-6">數學積木王大挑戰</h2>
+                                    <p className="text-lg text-slate-500 mb-12">來挑戰不同關卡，成為最強吧！</p>
                                     <button 
                                         onClick={() => setGameState('difficulty')}
                                         className="bg-orange-500 hover:bg-orange-600 text-white text-2xl font-black py-6 px-16 rounded-full shadow-[0_8px_0_rgb(194,65,12)] active:translate-y-2 active:shadow-none transition-all"
                                     >
-                                        立即開戰
+                                        開始挑戰
                                     </button>
                                 </div>
                             )}
 
                             {gameState === 'difficulty' && (
                                 <div className="text-center pop-in">
-                                    <h2 className="text-3xl font-black text-slate-800 mb-10">選擇你的戰場</h2>
+                                    <h2 className="text-3xl font-black text-slate-800 mb-10">選擇你的關卡</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                                         {[
                                             { lv: 1, title: '初級戰士', desc: '單組積木 (A×B)', col: 'bg-emerald-500' },
@@ -310,7 +310,7 @@
                                     <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-4">
                                         🎉 任務圓滿達成！
                                     </h2>
-                                    <p className="text-2xl text-amber-600 font-bold mb-10">你已成功獲得滿分 100 分！</p>
+                                    <p className="text-2xl text-amber-600 font-bold mb-10">恭喜你獲得滿分 100 分！</p>
                                     
                                     <div className="flex flex-col gap-4 px-6 md:px-12 items-center">
                                         {difficulty < 3 && (
@@ -350,3 +350,4 @@
     </script>
 </body>
 </html>
+
