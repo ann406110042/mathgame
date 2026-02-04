@@ -9,7 +9,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+            background-color: #f0f9ff;
         }
         .bounce {
             animation: bounce 2s infinite;
@@ -19,45 +19,25 @@
             40% {transform: translateY(-10px);}
             60% {transform: translateY(-5px);}
         }
-        .correct-pop {
-            animation: pop 0.4s ease-out;
-        }
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        /* 禁用狀態的樣式 */
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            filter: grayscale(0.5);
-        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <div id="game-container" class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 border-4 border-blue-400 relative overflow-hidden">
+    <div id="game-container" class="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border-4 border-blue-400 relative overflow-hidden">
         
-        <!-- 裝飾裝飾 -->
-        <div class="absolute -top-4 -right-4 opacity-10 text-8xl pointer-events-none">📏</div>
+        <!-- 裝飾用小圖示 -->
+        <div class="absolute top-2 right-2 opacity-10 text-6xl">📏</div>
         
         <!-- 選擇年級畫面 -->
         <div id="start-screen" class="text-center">
-            <div class="mb-6 inline-block bg-blue-100 p-4 rounded-full">
-                <span class="text-5xl">🎒</span>
-            </div>
-            <h1 class="text-3xl font-bold text-blue-600 mb-2">長度單位大挑戰</h1>
-            <p class="text-gray-500 mb-8">選擇年級，測試你的空間感！<br>(共 25 題)</p>
-            
+            <h1 class="text-3xl font-bold text-blue-600 mb-4">長度單位大挑戰</h1>
+            <p class="text-gray-600 mb-8 font-medium">挑戰目標：獲得 100 分！</p>
             <div class="space-y-4">
-                <button onclick="startGame(3)" class="w-full bg-orange-400 hover:bg-orange-500 text-white font-bold py-5 rounded-2xl shadow-lg transform transition active:scale-95 text-xl">
-                    三年級挑戰 <br>
-                    <span class="text-xs font-normal opacity-90">(毫米、公分、公尺)</span>
+                <button onclick="startGame(3)" class="w-full bg-orange-400 hover:bg-orange-500 text-white font-bold py-4 rounded-2xl shadow-lg transform transition active:scale-95 text-xl">
+                    三年級 <br><span class="text-sm font-normal">(毫米、公分、公尺)</span>
                 </button>
-                <button onclick="startGame(4)" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-lg transform transition active:scale-95 text-xl">
-                    四、五年級挑戰 <br>
-                    <span class="text-xs font-normal opacity-90">(包含「公里」進階題)</span>
+                <button onclick="startGame(4)" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg transform transition active:scale-95 text-xl">
+                    四、五年級 <br><span class="text-sm font-normal">(含 公里 挑戰)</span>
                 </button>
             </div>
         </div>
@@ -66,85 +46,53 @@
         <div id="quiz-screen" class="hidden">
             <div class="flex justify-between items-center mb-6">
                 <div class="flex flex-col">
-                    <span id="grade-badge" class="text-xs font-bold text-blue-500 mb-1 uppercase tracking-wider">模式載入中</span>
-                    <div class="bg-blue-100 px-4 py-1 rounded-full text-blue-700 font-bold text-sm">
-                        第 <span id="current-index">1</span> / 25 題
+                    <div id="grade-badge" class="text-xs text-blue-500 font-bold mb-1">模式載入中</div>
+                    <div class="text-sm text-gray-500 font-medium">
+                        進度：第 <span id="current-index">1</span> 題
                     </div>
                 </div>
-                <div class="bg-green-100 px-4 py-2 rounded-full text-green-700 font-bold shadow-sm">
-                    得分: <span id="score">0</span>
+                <div class="flex flex-col items-end">
+                    <div class="text-xs text-green-600 font-bold mb-1">目標：100 分</div>
+                    <div class="bg-green-100 px-4 py-2 rounded-full text-green-700 font-bold shadow-sm">
+                        <span id="score">0</span> 分
+                    </div>
                 </div>
             </div>
 
-            <div id="question-box" class="bg-yellow-50 rounded-3xl p-6 mb-4 border-2 border-yellow-200 text-center min-h-[160px] flex flex-col justify-center shadow-inner">
-                <h2 id="question-text" class="text-lg font-medium text-gray-600 mb-2"></h2>
-                <div class="flex items-baseline justify-center gap-2">
-                    <span id="question-hint" class="text-5xl font-black text-blue-600"></span>
-                    <span class="text-gray-400 text-xl font-bold">?</span>
-                </div>
+            <!-- 分數進度條 -->
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+                <div id="score-progress" class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
             </div>
 
-            <!-- AI 輔助按鈕 -->
-            <button id="ai-hint-btn" onclick="askAiAssistant()" class="w-full mb-6 bg-purple-50 hover:bg-purple-100 text-purple-600 text-sm font-bold py-3 rounded-xl border border-purple-200 transition duration-200 flex items-center justify-center gap-2 group">
-                <span class="group-hover:rotate-12 transition-transform">✨</span>
-                <span>老師，給我一點提示！</span>
-            </button>
+            <div id="question-box" class="bg-yellow-50 rounded-2xl p-6 mb-8 border-2 border-yellow-200 text-center min-h-[140px] flex flex-col justify-center">
+                <h2 id="question-text" class="text-xl font-bold text-gray-800 mb-1"></h2>
+                <p id="question-hint" class="text-4xl font-black text-blue-600"></p>
+            </div>
 
             <div id="options-grid" class="grid grid-cols-2 gap-4">
-                <!-- 由 JS 生成 -->
+                <!-- 按鈕由 JS 動態生成 -->
             </div>
 
-            <div id="feedback" class="mt-6 text-center h-8 font-bold text-lg transition-all duration-300"></div>
+            <div id="feedback" class="mt-6 text-center h-8 font-bold text-lg"></div>
         </div>
 
         <!-- 結算畫面 -->
         <div id="result-screen" class="hidden text-center">
-            <div class="text-7xl mb-4 bounce">🏆</div>
-            <h2 class="text-3xl font-bold text-blue-600 mb-2">太棒了！挑戰完成</h2>
-            
-            <div class="bg-blue-50 rounded-3xl p-6 mb-6 border-2 border-blue-100">
-                <p class="text-gray-500 font-bold mb-1">最終分數</p>
-                <p class="text-6xl font-black text-blue-600"><span id="final-score">0</span></p>
+            <div class="text-6xl mb-4 bounce">🏆</div>
+            <h2 class="text-3xl font-bold text-blue-600 mb-2">恭喜達成目標！</h2>
+            <div class="bg-blue-50 rounded-2xl p-6 mb-8 border-2 border-blue-100">
+                <p class="text-lg text-gray-700">最終得分</p>
+                <p class="text-6xl font-black text-blue-600"><span id="final-score">100</span></p>
+                <p id="stats-text" class="mt-4 text-sm text-gray-500"></p>
             </div>
             
-            <!-- AI 總結 -->
-            <div id="ai-summary" class="bg-purple-50 rounded-2xl p-5 mb-8 border border-purple-200 text-left hidden">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="text-xl">👩‍🏫</span>
-                    <span class="font-bold text-purple-700">AI 老師的結語：</span>
-                </div>
-                <div id="ai-summary-text" class="text-sm text-purple-800 leading-relaxed italic">
-                    正在撰寫專屬評語...
-                </div>
-            </div>
-
-            <button onclick="showStartScreen()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg transition active:scale-95">
+            <button onclick="showStartScreen()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-10 rounded-full shadow-lg transition duration-200">
                 再玩一次
             </button>
         </div>
     </div>
 
-    <!-- AI 提示彈窗 -->
-    <div id="ai-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center p-6 z-50 backdrop-blur-sm">
-        <div class="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl transform transition-all scale-100">
-            <div class="flex items-center gap-3 mb-4 text-purple-600">
-                <div class="bg-purple-100 p-2 rounded-lg text-2xl">✨</div>
-                <h3 class="font-bold text-xl">觀念小引導</h3>
-            </div>
-            <div id="ai-modal-content" class="text-gray-600 leading-relaxed mb-8 text-lg">
-                思考中...
-            </div>
-            <!-- 增加了 id="close-ai-modal-btn" 並預設為 disabled -->
-            <button id="close-ai-modal-btn" onclick="closeAiModal()" disabled class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl shadow-lg transition active:scale-95 disabled:bg-gray-300 disabled:shadow-none">
-                我懂了，去答題！
-            </button>
-        </div>
-    </div>
-
     <script>
-        const apiKey = ""; // Runtime provides the key
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'unit-quiz-gemini';
-
         const allQuestions = {
             3: [
                 { item: "一枚硬幣的厚度", value: 2, unit: "毫米" },
@@ -152,53 +100,53 @@
                 { item: "教室的高度", value: 3, unit: "公尺" },
                 { item: "橡皮擦的長度", value: 5, unit: "公分" },
                 { item: "一隻螞蟻的身長", value: 6, unit: "毫米" },
-                { item: "黑板的橫寬", value: 4, unit: "公尺" },
+                { item: "黑板的長度", value: 4, unit: "公尺" },
                 { item: "校門口到教室距離", value: 50, unit: "公尺" },
                 { item: "鉛筆盒的厚度", value: 3, unit: "公分" },
                 { item: "小螺絲釘的長度", value: 8, unit: "毫米" },
                 { item: "游泳池的長度", value: 25, unit: "公尺" },
                 { item: "手機的寬度", value: 7, unit: "公分" },
                 { item: "衛生紙盒的高度", value: 9, unit: "公分" },
-                { item: "大迴紋針的長度", value: 30, unit: "毫米" },
-                { item: "你的身高大約是 140", value: 140, unit: "公分" },
-                { item: "公車的車身長度", value: 12, unit: "公尺" },
+                { item: "迴紋針的長度", value: 30, unit: "毫米" },
+                { item: "身高大約是 140", value: 140, unit: "公分" },
+                { item: "公車的長度", value: 12, unit: "公尺" },
                 { item: "一元硬幣的直徑", value: 20, unit: "毫米" },
                 { item: "膠水瓶的高度", value: 12, unit: "公分" },
-                { item: "一隻小貓的身長", value: 30, unit: "公分" },
+                { item: "小貓的身長", value: 30, unit: "公分" },
                 { item: "書桌的寬度", value: 60, unit: "公分" },
-                { item: "路邊電線桿的高度", value: 10, unit: "公尺" },
+                { item: "電線桿的高度", value: 10, unit: "公尺" },
                 { item: "訂書針的寬度", value: 12, unit: "毫米" },
                 { item: "自動筆芯的粗細", value: 0.5, unit: "毫米" },
-                { item: "標準籃球場的長度", value: 28, unit: "公尺" },
-                { item: "一般長尺的長度", value: 30, unit: "公分" },
+                { item: "籃球場的長度", value: 28, unit: "公尺" },
+                { item: "長尺的長度", value: 30, unit: "公分" },
                 { item: "一棵大樹的高度", value: 15, unit: "公尺" }
             ],
             4: [
-                { item: "國道一號公路全長", value: 374, unit: "公里" },
-                { item: "台北 101 大樓高度", value: 508, unit: "公尺" },
-                { item: "智慧型手機的厚度", value: 9, unit: "毫米" },
-                { item: "全程馬拉松比賽距離", value: 42, unit: "公里" },
+                { item: "國道一號公路長度", value: 374, unit: "公里" },
+                { item: "台北101大樓高度", value: 508, unit: "公尺" },
+                { item: "手機的厚度", value: 9, unit: "毫米" },
+                { item: "馬拉松比賽距離", value: 42, unit: "公里" },
                 { item: "課桌椅的高度", value: 75, unit: "公分" },
-                { item: "台灣最高峰玉山高度", value: 3952, unit: "公尺" },
-                { item: "台北到高雄的直線距離", value: 350, unit: "公里" },
-                { item: "一本數學課本的厚度", value: 1, unit: "公分" },
-                { item: "標準田徑場跑道一圈", value: 400, unit: "公尺" },
+                { item: "玉山的高度", value: 3952, unit: "公尺" },
+                { item: "台北到高雄的距離", value: 350, unit: "公里" },
+                { item: "課本的厚度", value: 1, unit: "公分" },
+                { item: "一般訂書針的寬度", value: 12, unit: "毫米" },
+                { item: "田徑場跑道一圈", value: 400, unit: "公尺" },
                 { item: "捷運軌道的寬度", value: 1435, unit: "毫米" },
-                { item: "台灣本島南北的長度", value: 394, unit: "公里" },
-                { item: "自行車專用道的總長", value: 15, unit: "公里" },
-                { item: "學校旗桿的高度", value: 12, unit: "公尺" },
+                { item: "台灣南北的長度", value: 394, unit: "公里" },
+                { item: "自行車道的總長", value: 15, unit: "公里" },
+                { item: "旗桿的高度", value: 12, unit: "公尺" },
                 { item: "一根睫毛的長度", value: 8, unit: "毫米" },
-                { item: "社區登山步道的全長", value: 3500, unit: "公尺" },
-                { item: "蘇花公路總長度", value: 118, unit: "公里" },
+                { item: "登山步道的全長", value: 3500, unit: "公尺" },
+                { item: "蘇花公路長度", value: 118, unit: "公里" },
                 { item: "指甲生長一個月約", value: 3, unit: "毫米" },
                 { item: "一張悠遊卡的厚度", value: 1, unit: "毫米" },
-                { item: "大型貨櫃車的長度", value: 12, unit: "公尺" },
+                { item: "貨櫃車的長度", value: 12, unit: "公尺" },
                 { item: "地球赤道的周長", value: 40075, unit: "公里" },
-                { item: "河邊散步步道的寬度", value: 4, unit: "公尺" },
-                { item: "六人座餐桌的長度", value: 180, unit: "公分" },
-                { item: "筆記型電腦螢幕寬度", value: 35, unit: "公分" },
-                { item: "人類一根頭髮的直徑", value: 0.1, unit: "毫米" },
-                { item: "火車車廂的長度", value: 20, unit: "公尺" }
+                { item: "河邊步道的寬度", value: 4, unit: "公尺" },
+                { item: "餐桌的長度", value: 180, unit: "公分" },
+                { item: "筆記型電腦螢幕", value: 35, unit: "公分" },
+                { item: "一根頭髮的直徑", value: 0.1, unit: "毫米" }
             ]
         };
 
@@ -208,98 +156,52 @@
         };
 
         let currentGrade = 3;
-        let currentQuestions = [];
+        let poolQuestions = [];
         let currentIndex = 0;
         let score = 0;
+        let totalAnswered = 0;
 
-        async function geminiFetch(prompt, systemInstruction = "") {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: systemInstruction }] }
-            };
-
-            for (let i = 0; i < 5; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text;
-                } catch (e) {
-                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
-                }
-            }
-            return "抱歉，老師剛才發呆了，請再點一次！";
-        }
-
-        async function askAiAssistant() {
-            const modal = document.getElementById('ai-modal');
-            const content = document.getElementById('ai-modal-content');
-            const closeBtn = document.getElementById('close-ai-modal-btn');
-            const currentQ = currentQuestions[currentIndex];
-            
-            // 開啟視窗並禁用按鈕
-            modal.style.display = 'flex';
-            content.innerText = "正在為你尋找生活中的比喻...";
-            closeBtn.disabled = true;
-
-            const prompt = `題目是「${currentQ.item}」，數值是「${currentQ.value}」。正確答案是「${currentQ.unit}」。
-            請以親切小學老師的口吻，用兩句話給學生提示。不要直接說出答案。提示方向可以是：把這個長度跟身體部位（如手指、步長）或常見物品比較。`;
-            
-            const systemMsg = "你是一位幽默且溫暖的小學數學老師，擅長將長度單位具象化。";
-            const result = await geminiFetch(prompt, systemMsg);
-            
-            // 內容填入後啟用按鈕
-            content.innerText = result;
-            closeBtn.disabled = false;
-        }
-
-        function closeAiModal() {
-            document.getElementById('ai-modal').style.display = 'none';
-        }
-
-        async function getAiFinalSummary() {
-            const container = document.getElementById('ai-summary');
-            const text = document.getElementById('ai-summary-text');
-            container.classList.remove('hidden');
-            
-            const prompt = `學生完成了 25 題挑戰。年級：${currentGrade === 3 ? '三年級' : '四五年級'}，得分：${score}/100。
-            請寫一句簡短的評語。如果分數高，給予誇獎；如果分數低，給予溫暖的鼓勵並提醒該注意哪種單位的區分。50字以內。`;
-            
-            const result = await geminiFetch(prompt, "你是一位專業的教育導師。");
-            text.innerText = result;
-        }
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
 
         function showStartScreen() {
-            document.getElementById('start-screen').classList.remove('hidden');
-            document.getElementById('quiz-screen').classList.add('hidden');
-            document.getElementById('result-screen').classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
         }
 
         function startGame(grade) {
             currentGrade = grade;
-            currentQuestions = [...allQuestions[grade]].sort(() => Math.random() - 0.5).slice(0, 25);
+            // 題庫隨機排序
+            poolQuestions = [...allQuestions[grade]].sort(() => Math.random() - 0.5);
+            
             currentIndex = 0;
             score = 0;
+            totalAnswered = 0;
             
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('quiz-screen').classList.remove('hidden');
-            document.getElementById('result-screen').classList.add('hidden');
+            startScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            resultScreen.classList.add('hidden');
             
-            document.getElementById('grade-badge').innerText = grade === 3 ? "基礎模式 (3年級)" : "進階模式 (4-5年級)";
-            updateScore();
+            document.getElementById('grade-badge').innerText = grade === 3 ? "三年級模式" : "四五年級模式";
+            updateUI();
             showQuestion();
         }
 
         function showQuestion() {
             const feedback = document.getElementById('feedback');
             feedback.innerText = "";
-            const q = currentQuestions[currentIndex];
             
-            document.getElementById('current-index').innerText = currentIndex + 1;
+            // 如果題庫用完了，重新洗牌
+            if (currentIndex >= poolQuestions.length) {
+                poolQuestions.sort(() => Math.random() - 0.5);
+                currentIndex = 0;
+            }
+
+            const q = poolQuestions[currentIndex];
+            
+            document.getElementById('current-index').innerText = totalAnswered + 1;
             document.getElementById('question-text').innerText = q.item;
             document.getElementById('question-hint').innerText = q.value;
 
@@ -309,60 +211,64 @@
             const currentUnits = unitsByGrade[currentGrade];
             currentUnits.forEach(unit => {
                 const btn = document.createElement('button');
-                btn.className = "bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-2xl py-5 font-bold text-gray-700 transition duration-200 shadow-sm active:bg-blue-100 transform active:scale-95";
+                btn.className = "bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-xl py-4 font-bold text-gray-700 transition duration-200 shadow-sm active:bg-blue-100";
                 btn.innerText = unit;
+                btn.dataset.unit = unit;
                 btn.onclick = () => checkAnswer(unit, btn);
                 grid.appendChild(btn);
             });
         }
 
         function checkAnswer(selectedUnit, clickedBtn) {
-            const correctAnswer = currentQuestions[currentIndex].unit;
+            const correctAnswer = poolQuestions[currentIndex].unit;
             const feedback = document.getElementById('feedback');
             const buttons = document.querySelectorAll('#options-grid button');
             
             buttons.forEach(btn => btn.disabled = true);
+            totalAnswered++;
 
             if (selectedUnit === correctAnswer) {
                 score += 4;
-                updateScore();
-                feedback.innerText = "✨ 太厲害了！答對了";
-                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-green-500 correct-pop";
-                clickedBtn.classList.replace('border-blue-200', 'border-green-400');
-                clickedBtn.classList.add('bg-green-50');
+                updateUI();
+                clickedBtn.classList.remove('bg-white', 'hover:bg-blue-50', 'border-blue-200');
+                clickedBtn.classList.add('bg-green-500/50', 'border-green-500', 'text-green-800');
+                feedback.innerText = "⭐ 太棒了！答對了！";
+                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-green-500";
             } else {
-                feedback.innerText = `💡 哎呀，這題應該是「${correctAnswer}」`;
-                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-red-500";
-                clickedBtn.classList.replace('border-blue-200', 'border-red-400');
-                clickedBtn.classList.add('bg-red-50');
-                
-                // 標記正確答案
                 buttons.forEach(btn => {
-                    if (btn.innerText === correctAnswer) {
-                        btn.classList.replace('border-blue-200', 'border-green-400');
+                    if (btn.dataset.unit === correctAnswer) {
+                        btn.classList.remove('bg-white', 'hover:bg-blue-50', 'border-blue-200');
+                        btn.classList.add('bg-green-500/50', 'border-green-500', 'text-green-800');
+                    } else if (btn === clickedBtn) {
+                        btn.classList.remove('bg-white', 'hover:bg-blue-50', 'border-blue-200');
+                        btn.classList.add('bg-red-500/50', 'border-red-500', 'text-red-800');
                     }
                 });
+                feedback.innerText = `❌ 正確答案是「${correctAnswer}」`;
+                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-red-500";
             }
 
             setTimeout(() => {
-                currentIndex++;
-                if (currentIndex < currentQuestions.length) {
-                    showQuestion();
-                } else {
+                if (score >= 100) {
                     endGame();
+                } else {
+                    currentIndex++;
+                    showQuestion();
                 }
-            }, 1500);
+            }, 1200);
         }
 
-        function updateScore() {
+        function updateUI() {
             document.getElementById('score').innerText = score;
+            const progress = Math.min(score, 100);
+            document.getElementById('score-progress').style.width = `${progress}%`;
         }
 
         function endGame() {
-            document.getElementById('quiz-screen').classList.add('hidden');
-            document.getElementById('result-screen').classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
-            getAiFinalSummary();
+            document.getElementById('stats-text').innerText = `你一共挑戰了 ${totalAnswered} 題來達成目標！`;
         }
     </script>
 </body>
