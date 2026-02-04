@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>面積感官大挑戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+        }
+        .pop-in { animation: pop-in 0.5s cubic-bezier(0.26, 0.53, 0.74, 1.48); }
+        @keyframes pop-in { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1); } }
+        button:disabled { opacity: 0.7; cursor: not-allowed; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="game-container" class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 border-4 border-pink-400 relative overflow-hidden">
+        
+        <!-- 裝飾背景 -->
+        <div class="absolute -top-6 -left-6 opacity-10 text-8xl pointer-events-none rotate-12">🟦</div>
+        
+        <!-- 開始畫面 -->
+        <div id="start-screen" class="text-center">
+            <div class="mb-6 inline-block bg-pink-100 p-4 rounded-full">
+                <span class="text-5xl">📐</span>
+            </div>
+            <h1 class="text-3xl font-bold text-pink-600 mb-2">面積感官大挑戰</h1>
+            <p class="text-gray-500 mb-8 font-medium text-lg">你能猜對物體的面積嗎？<br><span class="text-sm text-pink-400">(共 25 題，滿分 100 分)</span></p>
+            
+            <button onclick="startGame()" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-5 rounded-2xl shadow-lg transform transition active:scale-95 text-xl">
+                開始挑戰！
+            </button>
+        </div>
+
+        <!-- 遊戲畫面 -->
+        <div id="quiz-screen" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div class="bg-pink-100 px-4 py-1 rounded-full text-pink-700 font-bold text-sm">
+                    第 <span id="current-index">1</span> / 25 題
+                </div>
+                <div class="bg-orange-100 px-4 py-1 rounded-full text-orange-700 font-bold text-sm">
+                    得分: <span id="score">0</span>
+                </div>
+            </div>
+
+            <div id="question-box" class="bg-pink-50 rounded-3xl p-6 mb-6 border-2 border-pink-100 text-center min-h-[160px] flex flex-col justify-center shadow-inner">
+                <h2 class="text-gray-500 text-sm mb-2 font-bold tracking-widest">請問這件物體的面積大約是？</h2>
+                <div id="question-text" class="text-3xl font-black text-pink-600 leading-tight"></div>
+            </div>
+
+            <div id="options-list" class="space-y-3">
+                <!-- 按鈕動態生成 -->
+            </div>
+
+            <div id="feedback" class="mt-6 text-center h-8 font-bold text-lg"></div>
+        </div>
+
+        <!-- 結算畫面 -->
+        <div id="result-screen" class="hidden text-center">
+            <div class="text-7xl mb-4">🎖️</div>
+            <h2 class="text-3xl font-bold text-pink-600 mb-2">挑戰完成！</h2>
+            <div class="bg-pink-50 rounded-3xl p-6 mb-8">
+                <p class="text-gray-500 font-bold mb-1">感官精準度得分</p>
+                <p class="text-6xl font-black text-pink-600"><span id="final-score">0</span></p>
+            </div>
+            
+            <button onclick="location.reload()" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 rounded-2xl shadow-lg transition active:scale-95">
+                重新挑戰
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 題目庫：增加至 25 題，均為整數選項，包含一個合理選項與兩個極端選項
+        const areaQuestions = [
+            { item: "一張「高鐵車票」", correct: 45, options: [5, 45, 450] },
+            { item: "一張「郵票」", correct: 6, options: [6, 60, 600] },
+            { item: "一個「橡皮擦」的面", correct: 10, options: [1, 10, 100] },
+            { item: "「數學課本」的封面", correct: 550, options: [55, 550, 5500] },
+            { item: "一片「墊板」", correct: 600, options: [60, 600, 6000] },
+            { item: "一個「1元硬幣」", correct: 3, options: [3, 30, 300] },
+            { item: "一張「百元鈔票」", correct: 100, options: [10, 100, 1000] },
+            { item: "一張「學生證卡片」", correct: 46, options: [4, 46, 460] },
+            { item: "一個「口罩」", correct: 160, options: [16, 160, 1600] },
+            { item: "一片「吐司」", correct: 100, options: [10, 100, 1000] },
+            { item: "一張「A4影印紙」", correct: 620, options: [62, 620, 6200] },
+            { item: "一個「電腦滑鼠墊」", correct: 400, options: [40, 400, 4000] },
+            { item: "一張「色紙」", correct: 225, options: [22, 225, 2250] },
+            { item: "一把「15公分直尺」", correct: 45, options: [4, 45, 450] },
+            { item: "一個「插座面板」", correct: 84, options: [8, 84, 840] },
+            { item: "一塊「方餅乾」", correct: 16, options: [2, 16, 160] },
+            { item: "一個「杯墊」", correct: 81, options: [8, 81, 810] },
+            { item: "一張「名片」", correct: 50, options: [5, 50, 500] },
+            { item: "一個「信封」", correct: 200, options: [20, 200, 2000] },
+            { item: "一塊「洗碗海綿」", correct: 70, options: [7, 70, 700] },
+            { item: "一張「便利貼」", correct: 49, options: [5, 49, 490] },
+            { item: "一個「小筆記本」封面", correct: 150, options: [15, 150, 1500] },
+            { item: "一片「巧克力糖」", correct: 12, options: [1, 12, 120] },
+            { item: "一張「健保卡」", correct: 46, options: [4, 46, 460] },
+            { item: "一個「平板電腦」螢幕", correct: 300, options: [30, 300, 3000] }
+        ];
+
+        let questions = [];
+        let currentIndex = 0;
+        let score = 0;
+
+        function startGame() {
+            // 洗牌並取出 25 題
+            questions = [...areaQuestions].sort(() => Math.random() - 0.5).slice(0, 25);
+            currentIndex = 0;
+            score = 0;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const q = questions[currentIndex];
+            document.getElementById('current-index').innerText = currentIndex + 1;
+            document.getElementById('question-text').innerText = q.item;
+            document.getElementById('score').innerText = score;
+            document.getElementById('feedback').innerText = "";
+            
+            const list = document.getElementById('options-list');
+            list.innerHTML = "";
+            
+            // 選項也隨機排序
+            const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+            
+            shuffledOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "w-full bg-white hover:bg-pink-50 border-2 border-pink-100 rounded-2xl py-4 font-bold text-gray-700 transition duration-200 flex justify-between px-6 items-center group";
+                btn.innerHTML = `<span>${opt}</span> <span class="text-gray-400 text-sm font-normal group-hover:text-pink-400">平方公分</span>`;
+                btn.onclick = () => checkAnswer(opt, btn);
+                list.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, btn) {
+            const q = questions[currentIndex];
+            const buttons = document.querySelectorAll('#options-list button');
+            buttons.forEach(b => b.disabled = true);
+
+            const feedback = document.getElementById('feedback');
+
+            if (selected === q.correct) {
+                score += 4; // 每題 4 分，25 題共 100 分
+                btn.classList.replace('border-pink-100', 'border-green-400');
+                btn.classList.add('bg-green-50');
+                feedback.innerText = "答對了！";
+                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-green-500 pop-in";
+            } else {
+                btn.classList.replace('border-pink-100', 'border-red-400');
+                btn.classList.add('bg-red-50');
+                feedback.innerText = "再想想～";
+                feedback.className = "mt-6 text-center h-8 font-bold text-lg text-red-400";
+                
+                // 標示正確答案
+                buttons.forEach(b => {
+                    if (parseInt(b.textContent) === q.correct) {
+                        b.classList.replace('border-pink-100', 'border-green-400');
+                        b.classList.add('bg-green-50');
+                    }
+                });
+            }
+
+            setTimeout(() => {
+                currentIndex++;
+                if (currentIndex < questions.length) {
+                    showQuestion();
+                } else {
+                    showResult();
+                }
+            }, 1200);
+        }
+
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+    </script>
+</body>
+</html>
